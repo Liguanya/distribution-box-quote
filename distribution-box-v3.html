@@ -168,63 +168,106 @@
             border-radius: 15px;
             margin-bottom: 30px;
             overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
         .box-card-header {
             background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
             color: white;
-            padding: 20px;
+            padding: 20px 25px;
+        }
+        .box-card-header .title-row {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-        }
-        .box-card-header h3 { font-size: 1.3rem; }
-        .box-info {
-            display: flex;
-            gap: 20px;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        .box-card-body { padding: 20px; }
-        
-        .box-summary {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
-        .box-summary-item {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 10px;
+        .box-card-header h3 { 
+            font-size: 1.5rem; 
+            margin: 0;
+        }
+        .box-card-header .box-meta {
+            display: flex;
+            gap: 25px;
+            font-size: 0.95rem;
+            opacity: 0.95;
+        }
+        .box-card-header .box-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .box-card-body { padding: 0; }
+        
+        /* 报价表格 - 工整格式 */
+        .quote-section {
+            padding: 20px 25px;
+        }
+        .quote-section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1e88e5;
+        }
+        .quote-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 0.95rem;
+        }
+        .quote-table th {
+            background: #f8f9fa;
+            color: #333;
+            padding: 12px 15px;
+            text-align: center;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+        }
+        .quote-table th:first-child { text-align: left; }
+        .quote-table td { 
+            padding: 12px 15px; 
+            border: 1px solid #dee2e6; 
             text-align: center;
         }
-        .box-summary-item h4 { color: #666; font-size: 0.85rem; margin-bottom: 5px; }
-        .box-summary-item .value { color: #1e88e5; font-size: 1.5rem; font-weight: bold; }
-        
-        .quote-table { width: 100%; border-collapse: collapse; }
-        .quote-table th {
-            background: #f5f5f5;
-            color: #333;
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #e0e0e0;
+        .quote-table td:first-child { text-align: center; }
+        .quote-table td:nth-child(2) { text-align: left; }
+        .quote-table .price { color: #e53935; font-weight: bold; }
+        .quote-table .model { 
+            font-family: "Consolas", "Monaco", monospace; 
+            background: #e3f2fd;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
         }
-        .quote-table td { padding: 10px; border-bottom: 1px solid #e0e0e0; }
-        .quote-table tr:hover { background: #f9f9f9; }
-        .quote-table .price { color: #f44336; font-weight: bold; }
-        .quote-table .model { font-family: monospace; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
         
+        /* 分隔小计行 */
+        .subtotal-row {
+            background: #fff8e1 !important;
+            font-weight: 600;
+        }
+        .subtotal-row td { border-top: 2px solid #ffc107; }
+        
+        /* 箱体行 */
+        .box-row {
+            background: #e8f5e9 !important;
+            font-weight: 600;
+        }
+        .box-row td { border-top: 2px solid #4caf50; }
+        
+        /* 合计行 */
         .box-total {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
+            padding: 20px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .box-total h4 { font-size: 1.1rem; }
-        .box-total .amount { font-size: 1.8rem; font-weight: bold; }
+        .box-total .label { font-size: 1.1rem; }
+        .box-total .amount { 
+            font-size: 1.6rem; 
+            font-weight: bold;
+        }
         
         /* 总汇总 */
         .grand-total {
@@ -253,8 +296,10 @@
         }
         
         @media (max-width: 768px) {
-            .box-summary { grid-template-columns: repeat(2, 1fr); }
+            .box-card-header .box-meta { flex-wrap: wrap; gap: 10px; }
             .grand-total { flex-direction: column; gap: 20px; }
+            .quote-table { font-size: 0.85rem; }
+            .quote-table th, .quote-table td { padding: 8px 6px; }
         }
     </style>
 </head>
@@ -771,7 +816,7 @@
             return box;
         }
         
-        // 显示结果
+        // 显示结果（工整版）
         function showResults(boxes) {
             const resultsSection = document.getElementById('resultsSection');
             resultsSection.classList.add('active');
@@ -790,7 +835,7 @@
                     if (sizes && sizes.length >= 2) {
                         const w = parseInt(sizes[0]);
                         const h = parseInt(sizes[1]);
-                        boxPrice = Math.max(150, (w * h) / 1000); // 按面积估算
+                        boxPrice = Math.max(150, (w * h) / 1000);
                     }
                 }
                 const boxAmount = boxPrice;
@@ -801,76 +846,84 @@
                 
                 const card = document.createElement('div');
                 card.className = 'box-card';
+                
+                // 动态计算箱体价格（保留2位小数）
+                const boxPriceDisplay = boxAmount.toFixed(2);
+                
                 card.innerHTML = `
+                    <!-- 卡片头部：箱体名称 + 基本信息 -->
                     <div class="box-card-header">
-                        <h3>📦 ${box.name}</h3>
-                        <div class="box-info">
-                            ${box.size ? `<span>📐 尺寸: ${box.size}mm</span>` : ''}
-                            <span>🔧 元器件: ${box.components.length} 种</span>
+                        <div class="title-row">
+                            <h3>📦 ${box.name}</h3>
+                            ${box.size ? `<span style="background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:15px;font-size:0.9rem;">📐 ${box.size}mm</span>` : ''}
+                        </div>
+                        <div class="box-meta">
+                            <span>🔧 元器件 ${box.components.length} 种</span>
+                            <span>📊 共 ${box.components.reduce((s, c) => s + c.count, 0)} 件</span>
                         </div>
                     </div>
+                    
+                    <!-- 报价区域 -->
                     <div class="box-card-body">
-                        <div class="box-summary">
-                            <div class="box-summary-item">
-                                <h4>元器件种数</h4>
-                                <div class="value">${box.components.length}</div>
-                            </div>
-                            <div class="box-summary-item">
-                                <h4>元器件总数</h4>
-                                <div class="value">${box.components.reduce((s, c) => s + c.count, 0)}</div>
-                            </div>
-                            <div class="box-summary-item">
-                                <h4>元器件价格</h4>
-                                <div class="value">¥${componentsAmount.toFixed(2)}</div>
-                            </div>
-                            <div class="box-summary-item">
-                                <h4>箱体价格</h4>
-                                <div class="value">¥${boxAmount.toFixed(2)}</div>
-                            </div>
-                        </div>
-                        
                         ${box.components.length > 0 ? `
-                        <table class="quote-table">
-                            <thead>
-                                <tr>
-                                    <th>序号</th>
-                                    <th>元器件</th>
-                                    <th>品牌</th>
-                                    <th>型号</th>
-                                    <th>数量</th>
-                                    <th>单价</th>
-                                    <th>合价</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${box.components.map((c, i) => `
+                        <div class="quote-section">
+                            <div class="quote-section-title">💡 元器件清单</div>
+                            <table class="quote-table">
+                                <thead>
                                     <tr>
-                                        <td>${i + 1}</td>
-                                        <td>${c.name}</td>
-                                        <td>${c.brand}</td>
-                                        <td><span class="model">${c.model}</span></td>
-                                        <td>${c.count}</td>
-                                        <td class="price">¥${c.price}</td>
-                                        <td class="price">¥${(c.price * c.count).toFixed(2)}</td>
+                                        <th style="width:8%">序号</th>
+                                        <th style="width:18%">元器件名称</th>
+                                        <th style="width:12%">品牌</th>
+                                        <th style="width:28%">型号规格</th>
+                                        <th style="width:8%">单位</th>
+                                        <th style="width:8%">数量</th>
+                                        <th style="width:9%">单价</th>
+                                        <th style="width:9%">合价</th>
                                     </tr>
-                                `).join('')}
-                                <tr style="background:#f5f5f5;font-weight:bold;">
-                                    <td colspan="4">元器件小计</td>
-                                    <td>${box.components.reduce((s, c) => s + c.count, 0)}</td>
-                                    <td>-</td>
-                                    <td class="price">¥${componentsAmount.toFixed(2)}</td>
-                                </tr>
-                                <tr style="background:#e3f2fd;">
-                                    <td colspan="5">箱体 (${box.size || '标准尺寸'})</td>
-                                    <td>1</td>
-                                    <td class="price">¥${boxAmount.toFixed(2)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        ` : '<p style="color:#999;text-align:center;padding:20px;">未识别到元器件</p>'}
+                                </thead>
+                                <tbody>
+                                    ${box.components.map((c, i) => `
+                                        <tr>
+                                            <td>${i + 1}</td>
+                                            <td><strong>${c.name}</strong></td>
+                                            <td>${c.brand}</td>
+                                            <td><span class="model">${c.model}</span></td>
+                                            <td>${c.unit}</td>
+                                            <td>${c.count}</td>
+                                            <td class="price">¥${c.price}</td>
+                                            <td class="price">¥${(c.price * c.count).toFixed(2)}</td>
+                                        </tr>
+                                    `).join('')}
+                                    <!-- 元器件小计 -->
+                                    <tr class="subtotal-row">
+                                        <td colspan="5">💰 元器件小计</td>
+                                        <td>${box.components.reduce((s, c) => s + c.count, 0)}</td>
+                                        <td>-</td>
+                                        <td class="price">¥${componentsAmount.toFixed(2)}</td>
+                                    </tr>
+                                    <!-- 箱体 -->
+                                    <tr class="box-row">
+                                        <td colspan="5">📦 配电箱箱体</td>
+                                        <td>1</td>
+                                        <td>¥${boxPriceDisplay}</td>
+                                        <td class="price">¥${boxPriceDisplay}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        ` : `
+                        <div class="quote-section">
+                            <div class="quote-section-title">⚠️ 未识别到元器件</div>
+                            <p style="text-align:center;color:#999;padding:30px;">请检查图片清晰度或手动输入元器件信息</p>
+                        </div>
+                        `}
                         
+                        <!-- 合计金额 -->
                         <div class="box-total">
-                            <h4>💰 ${box.name} 合计（含人工费15%）</h4>
+                            <div class="label">
+                                <span>💰 </span>${box.name} 造价合计
+                                <span style="font-size:0.85rem;opacity:0.8;margin-left:10px;">（含人工费15%）</span>
+                            </div>
                             <div class="amount">¥${(boxTotal * 1.15).toFixed(2)}</div>
                         </div>
                     </div>
@@ -882,19 +935,19 @@
             const grandEl = document.getElementById('grandTotal');
             grandEl.innerHTML = `
                 <div class="grand-total-item">
-                    <h4>配电箱数量</h4>
-                    <div class="value">${boxes.length}</div>
+                    <h4>📦 配电箱数量</h4>
+                    <div class="value">${boxes.length} 个</div>
                 </div>
                 <div class="grand-total-item">
-                    <h4>元器件总数</h4>
-                    <div class="value">${totalComponents}</div>
+                    <h4>🔧 元器件总数</h4>
+                    <div class="value">${totalComponents} 件</div>
                 </div>
                 <div class="grand-total-item">
-                    <h4>材料合计</h4>
+                    <h4>💵 材料费合计</h4>
                     <div class="value">¥${grandTotal.toFixed(2)}</div>
                 </div>
                 <div class="grand-total-item">
-                    <h4>含人工费(15%)</h4>
+                    <h4>🧾 含人工费(15%)</h4>
                     <div class="value">¥${(grandTotal * 1.15).toFixed(2)}</div>
                 </div>
             `;
