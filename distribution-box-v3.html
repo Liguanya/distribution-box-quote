@@ -505,20 +505,43 @@
         // 配电箱名称特点：通常是数字开头+字母组合，或者字母+数字组合
         // 例如：1JAL2-KS、2AL2-KS、AL1-1、AT-1、1AL1等
         const BOX_PATTERNS = [
-            // 数字开头+字母组合：如 1JAL2、2AL2、1AL1
-            /(?<![A-Za-z0-9])(\d{1,2}[A-Z]{1,4}\d*[A-Z]?(?:[-_]?(?:KS|KR|K|KS\d?|KR\d?))?)(?![A-Za-z0-9])/g,
+            // 数字开头+字母组合（最常见模式）：如 1JAL2、2AL2、1AL1
+            /(?<![A-Za-z0-9])(\d{1,2}[A-Z]{1,4}\d*[-_]?[A-Z]?[-_]?(?:KS|KR|K|1|2)?)(?![A-Za-z0-9])/g,
             // 字母开头+数字+横杠+字母：如 AL1-1、AT-1、AP-1
-            /(?<![A-Za-z0-9])([A-Z]{1,3}\d+[A-Z]?[-_]\d+)(?![A-Za-z0-9])/g,
+            /(?<![A-Za-z0-9])([A-Z]{1,3}\d+[-_]\d+)(?![A-Za-z0-9])/g,
             // 配电箱标注：如 配电箱1、配电箱2
             /(?<![A-Za-z0-9])(?:配电箱|箱)\s*(\d+|[一二三四五六七八九十]+)(?![A-Za-z0-9])/g,
         ];
         
-        // 需要排除的关键词（这些是元器件型号，不是配电箱名称）
+        // 需要排除的关键词（这些是元器件型号或电线电缆规格，不是配电箱名称）
         const EXCLUDED_KEYWORDS = [
             'SPD', 'CT', 'DM', 'KWH', 'INT', 'OT', 'WTS', 'LC', 'LR', 'LA', 
             'NS', 'iCT', 'iC65', 'SH', 'RT', 'Li', 'VE', 'A1P', 'ZRBV', 'CTU',
             'DG', '2DG', 'JX', '3JX', '25', '35', '70', '16', '10', '4×25',
-            '3×25', '3×16', '3×10', '2×25', '2×16', '2×10', '1×25', '1×16'
+            '3×25', '3×16', '3×10', '2×25', '2×16', '2×10', '1×25', '1×16',
+            'JDG', 'SCE', 'WC', 'L1', 'L2', 'L3', 'N', 'PE', '6', 'KW',
+            '备用', '配电', '电开水器', '热水', '控制器', 'WCR'
+        ];
+        
+        // 配电箱名称白名单（常见的配电箱命名模式）
+        // 这个列表用于补充OCR可能识别错误的情况
+        const KNOWN_BOX_PATTERNS = [
+            // JAL系列
+            /(\dJAL\d*[-_]?KS?)/gi,
+            /(\dJAL\d*[-_]?KR?)/gi,
+            // AL系列  
+            /(\dAL\d*[-_]?KS?)/gi,
+            /(\dAL\d*[-_]?KR?)/gi,
+            /(\dAL\d*[-_]?\d)/gi,
+            // AT/AP/AK系列
+            /(\dAT\d*[-_]?\d)/gi,
+            /(\dAP\d*[-_]?\d)/gi,
+            /(\dAK\d*[-_]?\d)/gi,
+            // APE/XK系列
+            /(APE[-_]?\w*)/gi,
+            /(XK[-_]?\w*)/gi,
+            // 总箱/电箱
+            /(总箱|电箱|照明箱|动力箱|应急箱)\s*(\d+)?/gi,
         ];
         
         // 开始识别
@@ -598,14 +621,15 @@
             processBtn.textContent = '🔍 开始AI识别';
         }
         
-        // 解析配电箱（重写版 - 按位置关联分配元器件）
+        // 解析配电箱（重写版 - 使用白名单 + 位置关联分配元器件）
         function parseBoxes(text) {
             const boxes = [];
             
             // 1. 识别配电箱名称及其位置
             const boxInfos = [];
             
-            BOX_PATTERNS.forEach(pattern => {
+            // 首先尝试白名单模式（更精确的配电箱命名）
+            KNOWN_BOX_PATTERNS.forEach(pattern => {
                 pattern.lastIndex = 0;
                 let match;
                 while ((match = pattern.exec(text)) !== null) {
@@ -613,32 +637,59 @@
                     const position = match.index;
                     
                     // 标准化名称
-                    let name = rawName.trim().toUpperCase();
+                    let name = rawName.trim().toUpperCase().replace(/\s+/g, '');
                     
-                    // 如果是"配电箱X"格式，转换为箱X
-                    const boxNumMatch = name.match(/(?:配电箱|箱)\s*(\d+|[一二三四五六七八九十]+)/);
-                    if (boxNumMatch) {
-                        const numMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
-                        const num = numMap[boxNumMatch[1]] || boxNumMatch[1];
-                        name = `箱${num}`;
-                    }
-                    
-                    // 排除元器件型号关键词
+                    // 排除非配电箱关键词
                     const shouldExclude = EXCLUDED_KEYWORDS.some(kw => 
-                        name === kw || name.startsWith(kw + '-') || name.includes(kw)
+                        name === kw || name.includes(kw) || kw.includes(name)
                     );
                     
-                    // 排除纯数字或太短的名称
-                    if (!shouldExclude && name.length >= 2 && !/^\d+$/.test(name)) {
-                        // 检查是否已存在
-                        const exists = boxInfos.some(b => b.name === name);
+                    if (!shouldExclude && name.length >= 3) {
+                        // 检查是否已存在（模糊匹配）
+                        const exists = boxInfos.some(b => 
+                            b.name === name || 
+                            b.name.includes(name) || 
+                            name.includes(b.name)
+                        );
                         if (!exists) {
-                            boxInfos.push({ name, position });
-                            addLog(`发现配电箱: ${name} (位置: ${position})`, 'success');
+                            boxInfos.push({ name, position, source: 'whitelist' });
+                            addLog(`✅ 白名单匹配到配电箱: ${name}`, 'success');
                         }
                     }
                 }
             });
+            
+            // 如果白名单没有找到，使用通用模式
+            if (boxInfos.length === 0) {
+                BOX_PATTERNS.forEach(pattern => {
+                    pattern.lastIndex = 0;
+                    let match;
+                    while ((match = pattern.exec(text)) !== null) {
+                        const rawName = match[1] || match[0];
+                        const position = match.index;
+                        
+                        // 标准化名称
+                        let name = rawName.trim().toUpperCase().replace(/\s+/g, '');
+                        
+                        // 排除非配电箱关键词
+                        const shouldExclude = EXCLUDED_KEYWORDS.some(kw => 
+                            name === kw || name.includes(kw) || kw.includes(name)
+                        );
+                        
+                        if (!shouldExclude && name.length >= 3 && !/^\d+$/.test(name)) {
+                            const exists = boxInfos.some(b => 
+                                b.name === name || 
+                                b.name.includes(name) || 
+                                name.includes(b.name)
+                            );
+                            if (!exists) {
+                                boxInfos.push({ name, position, source: 'pattern' });
+                                addLog(`🔍 模式匹配到配电箱: ${name}`, 'success');
+                            }
+                        }
+                    }
+                });
+            }
             
             // 2. 识别元器件及其位置
             const componentInfos = [];
