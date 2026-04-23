@@ -448,19 +448,33 @@
             { pattern: /WTS\s*[-_]?\s*(B?\d+)\s*[\/\\]\s*(\d+)\s*P/gi,
               info: { name: '双电源自动转换开关', brand: '施耐德万高', unit: '个', price: 580 } },
             
-            // 浪涌保护器
+            // 浪涌保护器 - 施耐德 LiD系列
+            { pattern: /LiD\s*40\s*\/\s*4/gi,
+              info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
+            { pattern: /LiD\s*(\d+)\s*\/\s*(\d+)/gi,
+              info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
             { pattern: /Li[DGS]ZX?\d*[A-Z]?\s*(\d+)\s*kA/gi,
               info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
             { pattern: /SPD\s*(\d+)\s*kA/gi,
               info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
             
-            // 电流互感器
-            { pattern: /iCT\s*(\d+)P?\s*[\/\\]?\s*(\d+)\s*A?/gi,
+            // 消防电源监控模块
+            { pattern: /WTS\s*[-_]?\s*B\s*(\d+)\s*[\/\\]\s*(\d+)\s*P/gi,
+              info: { name: '消防电源监控模块', brand: '施耐德万高', unit: '个', price: 580 } },
+            
+            // 电流互感器 - 施耐德 iCT系列
+            { pattern: /iCT\s*(\d+)\s*P?\s*[\/\\]?\s*(\d+)\s*A?/gi,
               info: { name: '电流互感器', brand: '施耐德', unit: '个', price: 85 } },
+            // 电流互感器 - 通用格式 75/5、100/5等
+            { pattern: /(\d+)\s*\/\s*5\s*A?/gi,
+              info: { name: '电流互感器', brand: '通用', unit: '个', price: 45 } },
+            // 电流互感器 - 其他格式
             { pattern: /CT\s*[-_]?\s*(\d+)\s*[\/\\]\s*(\d+)\s*A?/gi,
               info: { name: '电流互感器', brand: '通用', unit: '个', price: 45 } },
             
-            // 多功能电力仪表
+            // 多功能电力仪表 - KWH+格式
+            { pattern: /KWH\s*\+/gi,
+              info: { name: '多功能电力仪表', brand: '通用', unit: '个', price: 320 } },
             { pattern: /KWH\s*[+]?\s*(\d+)/gi,
               info: { name: '多功能电力仪表', brand: '通用', unit: '个', price: 320 } },
             { pattern: /DM\s*(\d+)\s*N?/gi,
@@ -476,6 +490,8 @@
             
             // 时间继电器
             { pattern: /时间继电器/gi,
+              info: { name: '时间继电器', brand: '通用', unit: '个', price: 85 } },
+            { pattern: /WCR\s*\d*/gi,
               info: { name: '时间继电器', brand: '通用', unit: '个', price: 85 } },
             
             // 接触器辅助触点
@@ -503,7 +519,7 @@
         
         // ========== 配电箱识别规则 ==========
         // 配电箱名称识别规则
-        // 配电箱名称通常包含：数字开头 + 字母组合，常见格式如 1JAL2-KS、2AL2-KS
+        // 配电箱名称通常包含：数字开头 + 字母组合，常见格式如 1JAL2-KS、2AL2-KS、APE-XK
         const BOX_PATTERNS = [
             // 格式1: 数字开头+字母组合+横杠+字母（最常见）
             /(?<![A-Za-z0-9])(\d{1,2}[A-Z]{1,4}\d*[-_][A-Z]{1,2})(?![A-Za-z0-9])/g,
@@ -511,7 +527,9 @@
             /(?<![A-Za-z0-9])(\d{1,2}[A-Z]{1,4}\d*[A-Z]?)(?![A-Za-z0-9])/g,
             // 格式3: 字母开头+数字+横杠+数字
             /(?<![A-Za-z0-9])([A-Z]{1,3}\d+[-_]\d+)(?![A-Za-z0-9])/g,
-            // 格式4: 中文配电箱标注
+            // 格式4: 字母开头+字母+横杠+字母（APE-XK、APE-XK1等）
+            /(?<![A-Za-z0-9])([A-Z]{2,4}[-][A-Z]{1,3}\d?)(?![A-Za-z0-9])/g,
+            // 格式5: 中文配电箱标注
             /(?<![A-Za-z0-9])(?:配电箱|箱)\s*(\d+|[一二三四五六七八九十]+)(?![A-Za-z0-9])/g,
         ];
         
@@ -540,8 +558,10 @@
             for (const pattern of EXCLUDED_PATTERNS) {
                 if (pattern.test(upper)) return false;
             }
-            // 必须包含字母和数字
-            if (!/[A-Z]/.test(upper) || !/\d/.test(upper)) return false;
+            // 必须包含字母和数字，或者符合 字母+横杠+字母 格式（如APE-XK）
+            const hasLetterAndNumber = /[A-Z]/.test(upper) && /\d/.test(upper);
+            const isAlphaDashAlpha = /^[A-Z]+-[A-Z]+$/i.test(upper) || /^[A-Z]+-[A-Z]+\d+$/i.test(upper);
+            if (!hasLetterAndNumber && !isAlphaDashAlpha) return false;
             return true;
         }
         
