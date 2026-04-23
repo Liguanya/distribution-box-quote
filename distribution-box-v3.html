@@ -531,6 +531,10 @@
             if (/^L\d+$/i.test(upper) || upper === 'N' || upper === 'PE' || /^WCR\d*$/i.test(upper)) return false;
             // 排除其他非配电箱名称
             if (/^A\d+P$/i.test(upper) || upper.includes('开水器') || upper.includes('热水') || upper.includes('控制器')) return false;
+            // 排除电线电缆规格（如5X6, 3X4等）
+            if (/^\d+X\d+$/i.test(upper) || /^[XYZ]?\d+X\d+/i.test(upper)) return false;
+            // 排除类似 "2ALZ" 这种被错误提取的片段
+            if (/^\d+[A-Z]{2,4}$/i.test(upper) && upper.length <= 6) return false;
             // 排除纯数字或太短的
             if (/^\d+$/.test(upper) || /^[A-Z]$/i.test(upper)) return false;
             // 必须包含字母和数字，或者符合 字母+横杠+字母 格式（如APE-XK）
@@ -842,6 +846,17 @@
             }
             
             return boxes;
+        }
+        
+        // 添加元器件到配电箱
+        function addComponentToBox(box, component) {
+            const existing = box.components.find(c => c.model === component.model);
+            if (existing) {
+                existing.count += component.count;
+            } else {
+                box.components.push({ ...component });
+            }
+            box.subtotal += component.price * component.count;
         }
         
         // 开始识别
