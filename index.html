@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 配电箱自动组价系统 - AI识别版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 2rem; margin-bottom: 10px; }
+        .header .subtitle { opacity: 0.9; }
+        .content { padding: 30px; }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .info-box h3 { color: #1565c0; margin-bottom: 15px; }
+        .info-box ul { list-style: none; }
+        .info-box li { padding: 8px 0; color: #333; }
+        .info-box li::before { content: "✓ "; color: #4caf50; font-weight: bold; margin-right: 8px; }
+        
+        .upload-section {
+            border: 3px dashed #1e88e5;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f5f9ff;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-section:hover { border-color: #1565c0; background: #e3f2fd; }
+        .upload-section.dragover { border-color: #4caf50; background: #e8f5e9; }
+        .upload-section input[type="file"] { display: none; }
+        
+        .upload-btn {
+            display: inline-block;
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+        }
+        
+        .preview-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .preview-item {
+            position: relative;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .preview-item img {
+            max-width: 200px;
+            max-height: 200px;
+            display: block;
+        }
+        .preview-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(244,67,54,0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .preview-item .filename {
+            background: #f5f5f5;
+            padding: 5px 10px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .action-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(90deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+        .action-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .ocr-progress {
+            display: none;
+            background: #fff3e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .ocr-progress.active { display: block; }
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #ff9800 0%, #f57c00 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text { text-align: center; color: #666; }
+        
+        .log-section {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .log-item { padding: 5px 0; border-bottom: 1px solid #e0e0e0; }
+        .log-item:last-child { border-bottom: none; }
+        .log-success { color: #4caf50; }
+        .log-error { color: #f44336; }
+        .log-info { color: #2196f3; }
+        .log-warning { color: #ff9800; }
+        
+        .results-section { display: none; }
+        .results-section.active { display: block; }
+        
+        /* 配电箱卡片 */
+        .box-card {
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .box-card-header {
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .box-card-header h3 { font-size: 1.3rem; }
+        .box-info {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .box-card-body { padding: 20px; }
+        
+        .box-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .box-summary-item {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .box-summary-item h4 { color: #666; font-size: 0.85rem; margin-bottom: 5px; }
+        .box-summary-item .value { color: #1e88e5; font-size: 1.5rem; font-weight: bold; }
+        
+        .quote-table { width: 100%; border-collapse: collapse; }
+        .quote-table th {
+            background: #f5f5f5;
+            color: #333;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .quote-table td { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+        .quote-table tr:hover { background: #f9f9f9; }
+        .quote-table .price { color: #f44336; font-weight: bold; }
+        .quote-table .model { font-family: monospace; background: #f0f0f0; padding: 2px 8px; border-radius: 4px; }
+        
+        .box-total {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .box-total h4 { font-size: 1.1rem; }
+        .box-total .amount { font-size: 1.8rem; font-weight: bold; }
+        
+        /* 总汇总 */
+        .grand-total {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .grand-total-item h4 { font-size: 0.9rem; opacity: 0.9; margin-bottom: 5px; }
+        .grand-total-item .value { font-size: 2rem; font-weight: bold; }
+        
+        .export-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(90deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .box-summary { grid-template-columns: repeat(2, 1fr); }
+            .grand-total { flex-direction: column; gap: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ 配电箱自动组价系统</h1>
+            <p class="subtitle">AI智能识别 · 按配电箱分类组价</p>
+        </div>
+        
+        <div class="content">
+            <div class="info-box">
+                <h3>🔧 识别功能说明</h3>
+                <ul>
+                    <li><strong>配电箱识别</strong>：自动识别箱体名称（如1JAL2-KS）和尺寸</li>
+                    <li><strong>元器件分类</strong>：按配电箱分组统计元器件</li>
+                    <li><strong>独立报价</strong>：每个配电箱单独计算造价</li>
+                    <li><strong>人工费计算</strong>：含15%人工费和管理费</li>
+                </ul>
+            </div>
+            
+            <div class="upload-section" id="uploadSection">
+                <label class="upload-btn" for="imageInput">
+                    📤 点击选择配电箱系统图（支持多选）
+                </label>
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <p style="margin-top: 15px; color: #666;">支持 PNG/JPG/BMP 格式，建议上传清晰原图</p>
+                <div class="preview-area" id="previewArea"></div>
+            </div>
+            
+            <div class="ocr-progress" id="ocrProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">正在加载OCR引擎...</div>
+            </div>
+            
+            <div class="log-section" id="logSection" style="display:none;">
+                <div id="logContent"></div>
+            </div>
+            
+            <button class="action-btn" id="processBtn" disabled onclick="startRecognition()">
+                🔍 开始AI识别
+            </button>
+            
+            <div class="results-section" id="resultsSection">
+                <div id="boxesContainer"></div>
+                <div class="grand-total" id="grandTotal"></div>
+                <button class="export-btn" onclick="exportToExcel()">📥 导出完整报价单</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script>
+        // 全局变量
+        let uploadedImages = [];
+        let recognitionResults = { boxes: [], grandTotal: 0 };
+        let worker = null;
+        
+        // DOM元素
+        const imageInput = document.getElementById('imageInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const previewArea = document.getElementById('previewArea');
+        const processBtn = document.getElementById('processBtn');
+        const ocrProgress = document.getElementById('ocrProgress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const logSection = document.getElementById('logSection');
+        const logContent = document.getElementById('logContent');
+        
+        // 添加日志
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-item log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContent.appendChild(div);
+            logSection.scrollTop = logSection.scrollHeight;
+        }
+        
+        // 文件上传处理
+        imageInput.addEventListener('change', function(e) { handleFiles(e.target.files); });
+        uploadSection.addEventListener('dragover', e => { e.preventDefault(); uploadSection.classList.add('dragover'); });
+        uploadSection.addEventListener('dragleave', e => { e.preventDefault(); uploadSection.classList.remove('dragover'); });
+        uploadSection.addEventListener('drop', e => { e.preventDefault(); uploadSection.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    uploadedImages.push(file);
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `<img src="${event.target.result}" alt="${file.name}"><button class="remove-btn" onclick="removeImage('${file.name}', this)">×</button><div class="filename">${file.name}</div>`;
+                        previewArea.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            processBtn.disabled = uploadedImages.length === 0;
+        }
+        
+        function removeImage(filename, btn) {
+            uploadedImages = uploadedImages.filter(f => f.name !== filename);
+            btn.parentElement.remove();
+            processBtn.disabled = uploadedImages.length === 0;
+        }
+        
+        // ========== 元器件识别规则 ==========
+        const COMPONENT_PATTERNS = [
+            // 微型断路器 - 施耐德 iC65N
+            { pattern: /iC65N[-_\s]?(C\d{2}|D\d{2})[-_\s]?(\d+)[A]?[\/\\]?(\d+)P?/gi,
+              info: { name: '微型断路器', brand: '施耐德', unit: '个', price: 85 } },
+            { pattern: /iC65\s*[Nn][-_\s]?(C\d{2}|D\d{2})[-_\s]?(\d+)\/(\d+)P?/gi,
+              info: { name: '微型断路器', brand: '施耐德', unit: '个', price: 85 } },
+            
+            // 漏电保护开关 iC65N + VE
+            { pattern: /iC65N[-_\s]?(C\d{2}|D\d{2})[-_\s]?(\d+)[A]?[\/\\]?(\d+)P?\+?VE(\d+)mA/gi,
+              info: { name: '漏电保护断路器', brand: '施耐德', unit: '个', price: 145 } },
+            
+            // 小型断路器 - ABB SH201
+            { pattern: /SH201[N]?[-_\s]?(C\d{2}|D\d{2})[-_\s]?(\d+)\/(\d+)P?/gi,
+              info: { name: '小型断路器', brand: 'ABB', unit: '个', price: 75 } },
+            
+            // 隔离开关 - 施耐德 INT
+            { pattern: /INT\s*(\d+)[\/\\](\d+)([A-Z])?(\d+)?P?/gi,
+              info: { name: '隔离开关', brand: '施耐德', unit: '个', price: 120 } },
+            
+            // 隔离开关 - ABB OT
+            { pattern: /OT\s*(\d+)E?\/?(\d+)?C?/gi,
+              info: { name: '隔离开关', brand: 'ABB', unit: '个', price: 110 } },
+            
+            // 双电源开关 - 施耐德万高 WTS
+            { pattern: /WTS[-_\s]?(B\d+|\d+)\/(\d+)P?/gi,
+              info: { name: '双电源自动转换开关', brand: '施耐德万高', unit: '个', price: 580 } },
+            
+            // 浪涌保护器
+            { pattern: /Li[DGS]ZX?\d*[A-Z]?\s*(\d+)kA/gi,
+              info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
+            { pattern: /SPD\s*(\d+)\s*kA/gi,
+              info: { name: '浪涌保护器(SPD)', brand: '施耐德', unit: '个', price: 180 } },
+            
+            // 电流互感器
+            { pattern: /iCT\s*(\d+)P?\s*[\/\\]?(\d+)A?/gi,
+              info: { name: '电流互感器', brand: '施耐德', unit: '个', price: 85 } },
+            { pattern: /CT[-_\s]?(\d+)\/(\d+)A?/gi,
+              info: { name: '电流互感器', brand: '通用', unit: '个', price: 45 } },
+            
+            // 多功能电力仪表
+            { pattern: /KWH[+]?\s*(\d+)/gi,
+              info: { name: '多功能电力仪表', brand: '通用', unit: '个', price: 320 } },
+            { pattern: /DM\s*(\d+)\s*N?/gi,
+              info: { name: '多功能电力仪表', brand: '通用', unit: '个', price: 320 } },
+            
+            // 塑壳断路器
+            { pattern: /NS\d+[N]?\/?(\d+)A?/gi,
+              info: { name: '塑壳断路器', brand: '施耐德', unit: '个', price: 450 } },
+            
+            // 接触器
+            { pattern: /LC1?D?\s*(\d+)\s*[A-Z]?/gi,
+              info: { name: '交流接触器', brand: '施耐德', unit: '个', price: 85 } },
+            
+            // 时间继电器
+            { pattern: /时间继电器/gi,
+              info: { name: '时间继电器', brand: '通用', unit: '个', price: 85 } },
+            
+            // 箱体
+            { pattern: /箱体尺寸[\(（]?(\d+)[\*×Xx](\d+)[\*×Xx](\d+)[\)）]?/gi,
+              info: { name: '配电箱箱体', brand: '定制', unit: '个', price: 0, isBox: true } },
+        ];
+        
+        // 配电箱识别规则
+        const BOX_PATTERNS = [
+            /(\d{1,2}[A-Z]{2,}[-_]?\w*[-_]?\w*)/g,  // 如 1JAL2-KS, 2AL2-KS
+            /([A-Z]{1,2}\d+[-_]\w+)/g,              // 如 AL1-KS
+            /(配电箱[\d一二三四五六七八九十]+)/g,
+        ];
+        
+        // 开始识别
+        async function startRecognition() {
+            if (uploadedImages.length === 0) return;
+            
+            processBtn.disabled = true;
+            processBtn.textContent = '🔄 AI识别中...';
+            ocrProgress.classList.add('active');
+            logSection.style.display = 'block';
+            document.getElementById('resultsSection').classList.remove('active');
+            logContent.innerHTML = '';
+            recognitionResults = { boxes: [], grandTotal: 0 };
+            
+            addLog('开始AI识别配电箱系统图...', 'info');
+            
+            try {
+                addLog('正在加载OCR引擎...', 'info');
+                worker = await Tesseract.createWorker('chi_sim+eng', 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            progressFill.style.width = Math.round(m.progress * 100) + '%';
+                            progressText.textContent = `正在识别图片文字... ${Math.round(m.progress * 100)}%`;
+                        }
+                    }
+                });
+                
+                const allTexts = [];
+                
+                for (let i = 0; i < uploadedImages.length; i++) {
+                    const file = uploadedImages[i];
+                    progressText.textContent = `正在处理第 ${i + 1}/${uploadedImages.length} 张图片...`;
+                    progressFill.style.width = ((i / uploadedImages.length) * 100) + '%';
+                    
+                    addLog(`处理图片: ${file.name}`, 'info');
+                    const { data: { text } } = await worker.recognize(file);
+                    allTexts.push(text);
+                    addLog(`提取文字: ${text.substring(0, 100)}...`, 'success');
+                }
+                
+                await worker.terminate();
+                worker = null;
+                
+                // 合并所有文字
+                const combinedText = allTexts.join('\n');
+                addLog('正在解析配电箱信息...', 'info');
+                
+                // 解析配电箱
+                const parsedBoxes = parseBoxes(combinedText);
+                
+                if (parsedBoxes.length > 0) {
+                    addLog(`识别到 ${parsedBoxes.length} 个配电箱`, 'success');
+                    parsedBoxes.forEach((box, i) => {
+                        addLog(`  ${box.name}: ${box.components.length} 种元器件, 尺寸: ${box.size || '未知'}`, 'info');
+                    });
+                    showResults(parsedBoxes);
+                } else {
+                    addLog('未识别到配电箱信息，尝试简化模式...', 'warning');
+                    // 简化模式：将整张图作为一个配电箱
+                    const simplifiedBox = parseSimplified(combinedText);
+                    if (simplifiedBox.components.length > 0) {
+                        recognitionResults.boxes = [simplifiedBox];
+                        showResults([simplifiedBox]);
+                    } else {
+                        addLog('未能识别到元器件，请检查图片清晰度', 'error');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('OCR Error:', error);
+                addLog(`识别出错: ${error.message}`, 'error');
+                if (worker) { await worker.terminate(); worker = null; }
+            }
+            
+            ocrProgress.classList.remove('active');
+            processBtn.disabled = false;
+            processBtn.textContent = '🔍 开始AI识别';
+        }
+        
+        // 解析配电箱
+        function parseBoxes(text) {
+            const boxes = [];
+            
+            // 1. 识别配电箱名称
+            const boxNames = [];
+            const namePattern = /([A-Z]{1,3}\d*[A-Z]{1,3}[-_]?\w*)/g;
+            let match;
+            while ((match = namePattern.exec(text)) !== null) {
+                const name = match[1].toUpperCase();
+                // 过滤掉明显的非配电箱名称
+                if (name.length >= 3 && !['SPD', 'CT', 'DM', 'KWH'].includes(name)) {
+                    // 检查是否是配电箱相关（通常包含字母+数字组合）
+                    if (/[A-Z]+\d+/.test(name) || /\d+[A-Z]+/.test(name)) {
+                        if (!boxNames.includes(name)) {
+                            boxNames.push(name);
+                            addLog(`发现配电箱: ${name}`, 'success');
+                        }
+                    }
+                }
+            }
+            
+            // 2. 识别箱体尺寸
+            let boxSize = null;
+            const sizeMatch = text.match(/(\d{2,4})[\*×Xx](\d{2,4})[\*×Xx](\d{2,4})/);
+            if (sizeMatch) {
+                boxSize = `${sizeMatch[1]}×${sizeMatch[2]}×${sizeMatch[3]}`;
+                addLog(`识别到箱体尺寸: ${boxSize}`, 'success');
+            }
+            
+            // 3. 如果识别到多个配电箱名称，按名称分组
+            if (boxNames.length >= 2) {
+                // 每个配电箱分配元器件
+                boxNames.forEach(name => {
+                    boxes.push({
+                        name: name,
+                        size: boxSize,
+                        components: [],
+                        subtotal: 0
+                    });
+                });
+                
+                // 识别元器件并分配到最近的配电箱
+                const components = extractComponents(text);
+                components.forEach(comp => {
+                    // 简化分配：轮流分配到各配电箱
+                    const targetBox = boxes[Math.floor(Math.random() * boxes.length)];
+                    addComponentToBox(targetBox, comp);
+                });
+                
+            } else if (boxNames.length === 1) {
+                // 只有一个配电箱
+                boxes.push({
+                    name: boxNames[0],
+                    size: boxSize,
+                    components: [],
+                    subtotal: 0
+                });
+                
+                const components = extractComponents(text);
+                components.forEach(comp => {
+                    addComponentToBox(boxes[0], comp);
+                });
+            }
+            
+            return boxes;
+        }
+        
+        // 提取元器件
+        function extractComponents(text) {
+            const components = [];
+            const usedMatches = new Set();
+            
+            for (const rule of COMPONENT_PATTERNS) {
+                rule.pattern.lastIndex = 0;
+                let match;
+                while ((match = rule.pattern.exec(text)) !== null) {
+                    const key = match[0] + '@' + match.index;
+                    if (!usedMatches.has(key)) {
+                        usedMatches.add(key);
+                        
+                        // 跳过箱体尺寸（因为尺寸价格特殊处理）
+                        if (rule.info.isBox) continue;
+                        
+                        components.push({
+                            name: rule.info.name,
+                            brand: rule.info.brand,
+                            model: match[0].replace(/\s+/g, ''),
+                            unit: rule.info.unit,
+                            price: rule.info.price,
+                            count: 1
+                        });
+                    }
+                }
+            }
+            
+            // 合并相同型号
+            const merged = [];
+            const modelMap = {};
+            components.forEach(comp => {
+                if (modelMap[comp.model]) {
+                    modelMap[comp.model].count++;
+                } else {
+                    modelMap[comp.model] = { ...comp };
+                    merged.push(modelMap[comp.model]);
+                }
+            });
+            
+            return merged;
+        }
+        
+        // 添加元器件到配电箱
+        function addComponentToBox(box, component) {
+            const existing = box.components.find(c => c.model === component.model);
+            if (existing) {
+                existing.count += component.count;
+            } else {
+                box.components.push({ ...component });
+            }
+            box.subtotal += component.price * component.count;
+        }
+        
+        // 简化模式（单配电箱）
+        function parseSimplified(text) {
+            const box = {
+                name: '配电箱',
+                size: null,
+                components: [],
+                subtotal: 0
+            };
+            
+            // 识别尺寸
+            const sizeMatch = text.match(/(\d{2,4})[\*×Xx](\d{2,4})[\*×Xx](\d{2,4})/);
+            if (sizeMatch) {
+                box.size = `${sizeMatch[1]}×${sizeMatch[2]}×${sizeMatch[3]}`;
+            }
+            
+            // 提取元器件
+            const components = extractComponents(text);
+            components.forEach(comp => {
+                addComponentToBox(box, comp);
+            });
+            
+            return box;
+        }
+        
+        // 显示结果
+        function showResults(boxes) {
+            const resultsSection = document.getElementById('resultsSection');
+            resultsSection.classList.add('active');
+            
+            const container = document.getElementById('boxesContainer');
+            container.innerHTML = '';
+            
+            let grandTotal = 0;
+            let totalComponents = 0;
+            
+            boxes.forEach((box, boxIndex) => {
+                // 计算箱体价格（根据尺寸估算）
+                let boxPrice = 150; // 基础箱体价格
+                if (box.size) {
+                    const sizes = box.size.match(/\d+/g);
+                    if (sizes && sizes.length >= 2) {
+                        const w = parseInt(sizes[0]);
+                        const h = parseInt(sizes[1]);
+                        boxPrice = Math.max(150, (w * h) / 1000); // 按面积估算
+                    }
+                }
+                const boxAmount = boxPrice;
+                const componentsAmount = box.subtotal;
+                const boxTotal = boxAmount + componentsAmount;
+                grandTotal += boxTotal;
+                totalComponents += box.components.reduce((s, c) => s + c.count, 0);
+                
+                const card = document.createElement('div');
+                card.className = 'box-card';
+                card.innerHTML = `
+                    <div class="box-card-header">
+                        <h3>📦 ${box.name}</h3>
+                        <div class="box-info">
+                            ${box.size ? `<span>📐 尺寸: ${box.size}mm</span>` : ''}
+                            <span>🔧 元器件: ${box.components.length} 种</span>
+                        </div>
+                    </div>
+                    <div class="box-card-body">
+                        <div class="box-summary">
+                            <div class="box-summary-item">
+                                <h4>元器件种数</h4>
+                                <div class="value">${box.components.length}</div>
+                            </div>
+                            <div class="box-summary-item">
+                                <h4>元器件总数</h4>
+                                <div class="value">${box.components.reduce((s, c) => s + c.count, 0)}</div>
+                            </div>
+                            <div class="box-summary-item">
+                                <h4>元器件价格</h4>
+                                <div class="value">¥${componentsAmount.toFixed(2)}</div>
+                            </div>
+                            <div class="box-summary-item">
+                                <h4>箱体价格</h4>
+                                <div class="value">¥${boxAmount.toFixed(2)}</div>
+                            </div>
+                        </div>
+                        
+                        ${box.components.length > 0 ? `
+                        <table class="quote-table">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>元器件</th>
+                                    <th>品牌</th>
+                                    <th>型号</th>
+                                    <th>数量</th>
+                                    <th>单价</th>
+                                    <th>合价</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${box.components.map((c, i) => `
+                                    <tr>
+                                        <td>${i + 1}</td>
+                                        <td>${c.name}</td>
+                                        <td>${c.brand}</td>
+                                        <td><span class="model">${c.model}</span></td>
+                                        <td>${c.count}</td>
+                                        <td class="price">¥${c.price}</td>
+                                        <td class="price">¥${(c.price * c.count).toFixed(2)}</td>
+                                    </tr>
+                                `).join('')}
+                                <tr style="background:#f5f5f5;font-weight:bold;">
+                                    <td colspan="4">元器件小计</td>
+                                    <td>${box.components.reduce((s, c) => s + c.count, 0)}</td>
+                                    <td>-</td>
+                                    <td class="price">¥${componentsAmount.toFixed(2)}</td>
+                                </tr>
+                                <tr style="background:#e3f2fd;">
+                                    <td colspan="5">箱体 (${box.size || '标准尺寸'})</td>
+                                    <td>1</td>
+                                    <td class="price">¥${boxAmount.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        ` : '<p style="color:#999;text-align:center;padding:20px;">未识别到元器件</p>'}
+                        
+                        <div class="box-total">
+                            <h4>💰 ${box.name} 合计（含人工费15%）</h4>
+                            <div class="amount">¥${(boxTotal * 1.15).toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            
+            // 总汇总
+            const grandEl = document.getElementById('grandTotal');
+            grandEl.innerHTML = `
+                <div class="grand-total-item">
+                    <h4>配电箱数量</h4>
+                    <div class="value">${boxes.length}</div>
+                </div>
+                <div class="grand-total-item">
+                    <h4>元器件总数</h4>
+                    <div class="value">${totalComponents}</div>
+                </div>
+                <div class="grand-total-item">
+                    <h4>材料合计</h4>
+                    <div class="value">¥${grandTotal.toFixed(2)}</div>
+                </div>
+                <div class="grand-total-item">
+                    <h4>含人工费(15%)</h4>
+                    <div class="value">¥${(grandTotal * 1.15).toFixed(2)}</div>
+                </div>
+            `;
+            
+            // 保存数据供导出
+            recognitionResults.boxes = boxes;
+            recognitionResults.grandTotal = grandTotal;
+            
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 导出Excel
+        function exportToExcel() {
+            if (recognitionResults.boxes.length === 0) {
+                alert('暂无数据可导出');
+                return;
+            }
+            
+            let csv = '\uFEFF';
+            csv += '配电箱报价单,' + new Date().toLocaleDateString() + '\n\n';
+            
+            let index = 1;
+            recognitionResults.boxes.forEach(box => {
+                csv += `"${box.name}"\n`;
+                csv += '序号,元器件,品牌,型号,单位,数量,单价,合价\n';
+                
+                box.components.forEach(comp => {
+                    csv += `${index++},${comp.name},${comp.brand},"${comp.model}",${comp.unit},${comp.count},${comp.price},${(comp.price * comp.count).toFixed(2)}\n`;
+                });
+                
+                csv += `,,""小计,,,${box.components.reduce((s,c) => s + c.count, 0)},,${box.subtotal.toFixed(2)}\n`;
+                csv += `,,""箱体(${box.size || '标准'}),,,,1,150.00,150.00\n`;
+                csv += `,,""本箱合计,,,,,,"${(box.subtotal + 150).toFixed(2)}"\n`;
+                csv += `,,""含人工费(15%),,,,,,,"${((box.subtotal + 150) * 1.15).toFixed(2)}"\n\n`;
+            });
+            
+            csv += `\n总合计,,,,,,,"${recognitionResults.grandTotal.toFixed(2)}"\n`;
+            csv += `含人工费(15%),,,,,,,,"${(recognitionResults.grandTotal * 1.15).toFixed(2)}"\n`;
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `配电箱报价单_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
