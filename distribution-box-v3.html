@@ -776,6 +776,17 @@
             return null;
         }
         
+        // 添加元器件到配电箱（必须在 parseBoxesPerImage 之前定义）
+        function addComponentToBox(box, component) {
+            const existing = box.components.find(c => c.model === component.model);
+            if (existing) {
+                existing.count += component.count;
+            } else {
+                box.components.push({ ...component });
+            }
+            box.subtotal += component.price * component.count;
+        }
+        
         // ========== 按图片独立解析配电箱（彻底重写）==========
         function parseBoxesPerImage(text, imageIndex, fileName) {
             const boxes = [];
@@ -846,17 +857,6 @@
             }
             
             return boxes;
-        }
-        
-        // 添加元器件到配电箱
-        function addComponentToBox(box, component) {
-            const existing = box.components.find(c => c.model === component.model);
-            if (existing) {
-                existing.count += component.count;
-            } else {
-                box.components.push({ ...component });
-            }
-            box.subtotal += component.price * component.count;
         }
         
         // 开始识别
