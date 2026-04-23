@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配电箱自动组价系统 - 智能识别版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .content {
+            padding: 30px;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .info-box h3 {
+            color: #1565c0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .info-box li {
+            padding: 8px 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .info-box li::before {
+            content: "✓";
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .upload-section {
+            border: 3px dashed #1e88e5;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f5f9ff;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upload-section:hover {
+            border-color: #1565c0;
+            background: #e3f2fd;
+        }
+        .upload-section.dragover {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+        .upload-section input[type="file"] {
+            display: none;
+        }
+        .upload-btn {
+            display: inline-block;
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(30,136,229,0.4);
+        }
+        .preview-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .preview-item {
+            position: relative;
+            width: 150px;
+        }
+        .preview-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+        .preview-item .remove {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .config-section {
+            background: #fafafa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        .config-section h3 {
+            color: #1565c0;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        .config-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .config-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        .config-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .config-item select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        .config-item select:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+        .action-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(90deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(67,160,71,0.4);
+        }
+        .action-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .results-section {
+            display: none;
+        }
+        .results-section.active {
+            display: block;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .summary-card.green {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+        }
+        .summary-card.orange {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        }
+        .summary-card h4 {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .quote-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .quote-table th {
+            background: #1e88e5;
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 500;
+        }
+        .quote-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .quote-table tr:hover {
+            background: #f5f5f5;
+        }
+        .quote-table .price {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .download-section {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .download-btn {
+            display: inline-block;
+            background: white;
+            color: #2e7d32;
+            padding: 15px 50px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 15px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .download-btn:hover {
+            transform: scale(1.05);
+        }
+        .processing-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .processing-overlay.active {
+            display: flex;
+        }
+        .processing-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e88e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .logic-section {
+            background: #fff3e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .logic-section h4 {
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+        .logic-section code {
+            background: #ffe0b2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .recognition-log {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .recognition-log .log-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .recognition-log .log-item:last-child {
+            border-bottom: none;
+        }
+        .log-success { color: #4caf50; }
+        .log-info { color: #2196f3; }
+        .log-warning { color: #ff9800; }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.5rem; }
+            .content { padding: 15px; }
+            .summary-cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ 配电箱自动组价系统</h1>
+            <p>上传配电箱系统图，自动识别元器件并生成Excel报价单</p>
+        </div>
+        
+        <div class="content">
+            <div class="info-box">
+                <h3>🔧 识别逻辑说明</h3>
+                <ul>
+                    <li>支持识别 <code>iC65N</code>、<code>SH201</code> 系列断路器</li>
+                    <li>支持识别 <code>INT</code>、<code>OT</code> 系列隔离开关</li>
+                    <li>支持识别 <code>WTS-</code> 系列双电源开关</li>
+                    <li>支持识别 <code>LiD</code>、<code>LiGZX</code> 系列浪涌保护器</li>
+                    <li>支持识别电流互感器、多功能电力仪表等</li>
+                    <li>自动匹配施耐德、ABB等品牌参考价格</li>
+                </ul>
+            </div>
+            
+            <div class="logic-section">
+                <h4>📋 支持的元器件识别规则</h4>
+                <p>
+                    <code>iC65N-C20A/2P</code> → 微型断路器（施耐德）
+                    &nbsp;|&nbsp;
+                    <code>INT125/63/3P</code> → 隔离开关（施耐德）
+                    <br>
+                    <code>WTS-B63/4P</code> → 双电源开关（施耐德万高）
+                    &nbsp;|&nbsp;
+                    <code>LiD40X4 40kA</code> → 浪涌保护器
+                    <br>
+                    <code>KWH+</code> → 多功能电力仪表
+                    &nbsp;|&nbsp;
+                    <code>75/5A</code> → 电流互感器
+                </p>
+            </div>
+            
+            <div class="upload-section" id="uploadSection">
+                <label class="upload-btn" for="imageInput">
+                    📤 点击选择配电箱系统图（支持多选）
+                </label>
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <p style="margin-top: 15px; color: #666;">支持 PNG/JPG/BMP 格式</p>
+                <div class="preview-area" id="previewArea"></div>
+            </div>
+            
+            <div class="config-section">
+                <h3>⚙️ 配置选项</h3>
+                <div class="config-row">
+                    <div class="config-item">
+                        <label>元器件品牌偏好</label>
+                        <select id="brandSelect">
+                            <option value="both">ABB + 施耐德</option>
+                            <option value="abb">ABB</option>
+                            <option value="schneider">施耐德</option>
+                            <option value="abb_first">优先ABB</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label>识别模式</label>
+                        <select id="modeSelect">
+                            <option value="demo">演示模式（模拟数据）</option>
+                            <option value="ocr">OCR识别（需配置API）</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="processBtn" disabled>
+                🔍 识别元器件并询价
+            </button>
+            
+            <div class="recognition-log" id="recognitionLog">
+                <div class="log-item log-info">等待上传配电箱系统图...</div>
+            </div>
+            
+            <div class="results-section" id="resultsSection">
+                <h2 style="margin-bottom: 20px; color: #1565c0;">📊 识别结果</h2>
+                
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <h4>元器件数量</h4>
+                        <div class="value" id="componentCount">0</div>
+                    </div>
+                    <div class="summary-card green">
+                        <h4>元器件合计</h4>
+                        <div class="value" id="subtotal">¥0.00</div>
+                    </div>
+                    <div class="summary-card orange">
+                        <h4>含人工费(15%)</h4>
+                        <div class="value" id="totalPrice">¥0.00</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 15px;">📦 报价明细</h3>
+                <table class="quote-table" id="quoteTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>元器件名称</th>
+                            <th>规格型号</th>
+                            <th>品牌</th>
+                            <th>数量</th>
+                            <th>单位</th>
+                            <th>单价(元)</th>
+                            <th>小计(元)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quoteTableBody">
+                    </tbody>
+                </table>
+                
+                <div class="download-section">
+                    <h3>📥 下载报价单</h3>
+                    <p style="margin-top: 10px;">包含元器件清单和报价汇总</p>
+                    <span class="download-btn" id="downloadBtn">
+                        ⬇️ 下载 Excel 文件
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="processing-box">
+            <div class="spinner"></div>
+            <h3 id="processingText">正在识别元器件...</h3>
+            <p style="color: #666; margin-top: 10px;">请稍候</p>
+        </div>
+    </div>
+
+    <script>
+        // 存储上传的图片和提取的数据
+        let uploadedImages = [];
+        let extractedComponents = [];
+        
+        // API地址（根据实际部署修改）
+        const API_BASE = '';  // 留空表示同源部署
+        
+        // DOM元素
+        const imageInput = document.getElementById('imageInput');
+        const previewArea = document.getElementById('previewArea');
+        const processBtn = document.getElementById('processBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const processingOverlay = document.getElementById('processingOverlay');
+        const processingText = document.getElementById('processingText');
+        const recognitionLog = document.getElementById('recognitionLog');
+        
+        // 日志函数
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-item log-${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            recognitionLog.appendChild(div);
+            recognitionLog.scrollTop = recognitionLog.scrollHeight;
+        }
+        
+        // 图片上传处理
+        imageInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    uploadedImages.push(file);
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `
+                            <img src="${event.target.result}" alt="${file.name}">
+                            <span class="remove" onclick="removeImage(this, '${file.name}')">×</span>
+                        `;
+                        previewArea.appendChild(div);
+                        addLog(`已上传: ${file.name} (${(file.size/1024).toFixed(1)}KB)`, 'success');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            updateProcessBtn();
+        });
+        
+        // 拖拽上传
+        const uploadSection = document.getElementById('uploadSection');
+        uploadSection.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        uploadSection.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        uploadSection.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            const input = document.getElementById('imageInput');
+            const dt = new DataTransfer();
+            files.forEach(f => dt.items.add(f));
+            input.files = dt.files;
+            imageInput.dispatchEvent(new Event('change'));
+        });
+        
+        // 移除图片
+        function removeImage(element, filename) {
+            uploadedImages = uploadedImages.filter(f => f.name !== filename);
+            element.parentElement.remove();
+            updateProcessBtn();
+            addLog(`已移除: ${filename}`, 'warning');
+        }
+        
+        // 更新处理按钮状态
+        function updateProcessBtn() {
+            processBtn.disabled = uploadedImages.length === 0;
+        }
+        
+        // 处理按钮点击
+        processBtn.addEventListener('click', function() {
+            if (uploadedImages.length === 0) return;
+            
+            processingOverlay.classList.add('active');
+            processingText.textContent = '正在识别元器件...';
+            
+            const mode = document.getElementById('modeSelect').value;
+            
+            if (mode === 'demo') {
+                // 演示模式：使用模拟数据
+                setTimeout(() => {
+                    addLog('开始模拟元器件识别...', 'info');
+                    simulateRecognition();
+                }, 500);
+            } else {
+                // OCR模式：需要上传到服务器
+                addLog('开始OCR识别...', 'info');
+                uploadAndRecognize();
+            }
+        });
+        
+        // 模拟识别过程
+        function simulateRecognition() {
+            const recognitionSteps = [
+                { text: '正在加载图片...', delay: 300 },
+                { text: '图片预处理完成', delay: 200 },
+                { text: '正在检测元器件区域...', delay: 400 },
+                { text: '发现元器件: 配电箱箱体 600×800×200mm', delay: 300 },
+                { text: '发现元器件: 隔离开关 INT125/63/3P ×2', delay: 200 },
+                { text: '发现元器件: 双电源开关 WTS-B63/4P', delay: 300 },
+                { text: '发现元器件: 电流互感器 75/5A ×3', delay: 200 },
+                { text: '发现元器件: 多功能仪表 KWH+', delay: 300 },
+                { text: '发现元器件: 微型断路器 iC65N-C20A/2P ×12', delay: 200 },
+                { text: '发现元器件: 浪涌保护器 LiGZX4L 40kA', delay: 300 },
+                { text: '元器件识别完成，共 8 种元器件', delay: 200 },
+                { text: '正在查询参考价格...', delay: 400 },
+                { text: '价格查询完成', delay: 200 },
+                { text: '正在生成报价单...', delay: 300 },
+                { text: '✅ 识别完成！', delay: 200 }
+            ];
+            
+            let stepIndex = 0;
+            
+            function processStep() {
+                if (stepIndex >= recognitionSteps.length) {
+                    // 识别完成
+                    extractedComponents = getDemoComponents();
+                    displayResults();
+                    processingOverlay.classList.remove('active');
+                    return;
+                }
+                
+                const step = recognitionSteps[stepIndex];
+                processingText.textContent = step.text;
+                addLog(step.text, step.text.includes('✅') ? 'success' : 'info');
+                stepIndex++;
+                
+                setTimeout(processStep, step.delay);
+            }
+            
+            processStep();
+        }
+        
+        // 上传到服务器识别
+        async function uploadAndRecognize() {
+            try {
+                const formData = new FormData();
+                uploadedImages.forEach(file => {
+                    formData.append('files', file);
+                });
+                
+                const response = await fetch(`${API_BASE}/api/recognize_file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`识别成功！发现 ${result.data.components.length} 个元器件`, 'success');
+                    extractedComponents = result.data.components;
+                    displayResults();
+                } else {
+                    addLog(`识别失败: ${result.message}`, 'warning');
+                    // 回退到演示模式
+                    addLog('回退到演示模式...', 'info');
+                    simulateRecognition();
+                }
+            } catch (error) {
+                addLog(`网络错误: ${error.message}`, 'warning');
+                addLog('使用演示模式...', 'info');
+                simulateRecognition();
+            }
+            
+            processingOverlay.classList.remove('active');
+        }
+        
+        // 演示数据
+        function getDemoComponents() {
+            return [
+                {name: '配电箱箱体', spec: '600×800×200mm', brand: '国产', quantity: 1, unit: '台', unit_price: 240, total: 240},
+                {name: '隔离开关', spec: 'INT125/63/3P', brand: '施耐德', quantity: 2, unit: '个', unit_price: 120, total: 240},
+                {name: '双电源自动转换开关', spec: 'WTS-B63/4P', brand: '施耐德万高', quantity: 1, unit: '台', unit_price: 5998, total: 5998},
+                {name: '电流互感器', spec: '75/5A', brand: '施耐德', quantity: 3, unit: '个', unit_price: 60, total: 180},
+                {name: '多功能电力仪表', spec: 'KWH+', brand: '待定', quantity: 1, unit: '台', unit_price: 265, total: 265},
+                {name: '微型断路器', spec: 'iC65N-C20A/2P', brand: '施耐德', quantity: 12, unit: '个', unit_price: 58, total: 696},
+                {name: '微型断路器', spec: 'iC65N-D25A/3P', brand: '施耐德', quantity: 1, unit: '个', unit_price: 85, total: 85},
+                {name: '浪涌保护器(SPD)', spec: 'LiGZX4L 40kA', brand: '施耐德', quantity: 1, unit: '套', unit_price: 380, total: 380},
+            ];
+        }
+        
+        // 显示结果
+        function displayResults() {
+            const subtotal = extractedComponents.reduce((sum, c) => sum + c.total, 0);
+            const labor = subtotal * 0.15;
+            const total = subtotal + labor;
+            
+            document.getElementById('componentCount').textContent = extractedComponents.length;
+            document.getElementById('subtotal').textContent = `¥${subtotal.toFixed(2)}`;
+            document.getElementById('totalPrice').textContent = `¥${total.toFixed(2)}`;
+            
+            const tbody = document.getElementById('quoteTableBody');
+            tbody.innerHTML = '';
+            
+            extractedComponents.forEach((comp, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${comp.name}</td>
+                    <td>${comp.spec}</td>
+                    <td>${comp.brand}</td>
+                    <td>${comp.quantity}</td>
+                    <td>${comp.unit}</td>
+                    <td class="price">¥${comp.unit_price.toFixed(2)}</td>
+                    <td class="price">¥${comp.total.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            resultsSection.classList.add('active');
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 下载Excel
+        document.getElementById('downloadBtn').addEventListener('click', async function() {
+            if (extractedComponents.length === 0) {
+                alert('没有可导出的数据');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/export_excel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ components: extractedComponents })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `配电箱报价单_${new Date().toISOString().slice(0,10)}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    addLog('报价单已下载', 'success');
+                } else {
+                    throw new Error('下载失败');
+                }
+            } catch (error) {
+                addLog(`下载失败: ${error.message}`, 'warning');
+                // 提示用户手动保存
+                alert('演示模式下请手动复制识别结果');
+            }
+        });
+        
+        // 初始化
+        addLog('系统初始化完成，等待上传配电箱系统图...', 'info');
+    </script>
+</body>
+</html>

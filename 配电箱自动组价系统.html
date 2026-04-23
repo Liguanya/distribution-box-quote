@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配电箱自动组价系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        .content {
+            padding: 30px;
+        }
+        .upload-section {
+            border: 3px dashed #1e88e5;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f5f9ff;
+            margin-bottom: 30px;
+            transition: all 0.3s;
+        }
+        .upload-section:hover {
+            border-color: #1565c0;
+            background: #e3f2fd;
+        }
+        .upload-section input[type="file"] {
+            display: none;
+        }
+        .upload-btn {
+            display: inline-block;
+            background: linear-gradient(90deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(30,136,229,0.4);
+        }
+        .preview-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .preview-item {
+            position: relative;
+            width: 150px;
+        }
+        .preview-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+        }
+        .preview-item .remove {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 24px;
+            height: 24px;
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .config-section {
+            background: #fafafa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        .config-section h3 {
+            color: #1565c0;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        .config-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .config-item {
+            flex: 1;
+            min-width: 200px;
+        }
+        .config-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .config-item select, .config-item input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        .config-item select:focus, .config-item input:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+        .action-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(90deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 30px;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(67,160,71,0.4);
+        }
+        .action-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .results-section {
+            display: none;
+        }
+        .results-section.active {
+            display: block;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .summary-card.green {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+        }
+        .summary-card.orange {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        }
+        .summary-card h4 {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .quote-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .quote-table th {
+            background: #1e88e5;
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 500;
+        }
+        .quote-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .quote-table tr:hover {
+            background: #f5f5f5;
+        }
+        .quote-table .price {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .quote-table .link a {
+            color: #1e88e5;
+            text-decoration: none;
+        }
+        .quote-table .link a:hover {
+            text-decoration: underline;
+        }
+        .download-section {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .download-btn {
+            display: inline-block;
+            background: white;
+            color: #2e7d32;
+            padding: 15px 50px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: transform 0.2s;
+        }
+        .download-btn:hover {
+            transform: scale(1.05);
+        }
+        .channels-info {
+            background: #e3f2fd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .channels-info h4 {
+            color: #1565c0;
+            margin-bottom: 10px;
+        }
+        .channel-tag {
+            display: inline-block;
+            background: #1e88e5;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin: 5px 5px 5px 0;
+            font-size: 0.9rem;
+        }
+        .processing-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .processing-overlay.active {
+            display: flex;
+        }
+        .processing-box {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e88e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .note {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 10px 10px 0;
+        }
+        .note h4 {
+            color: #e65100;
+            margin-bottom: 8px;
+        }
+        .note p {
+            color: #333;
+            line-height: 1.6;
+        }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.5rem; }
+            .content { padding: 15px; }
+            .summary-cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ 配电箱自动组价系统</h1>
+            <p>上传配电箱系统图，自动提取元器件并生成Excel报价单</p>
+        </div>
+        
+        <div class="content">
+            <div class="channels-info">
+                <h4>🔗 询价渠道（按优先级）</h4>
+                <span class="channel-tag">1. ABB直通车</span>
+                <span class="channel-tag">2. 天工直通车</span>
+                <span class="channel-tag">3. 工控猫商城</span>
+            </div>
+            
+            <div class="upload-section">
+                <label class="upload-btn" for="imageInput">
+                    📤 点击选择配电箱系统图（支持多选）
+                </label>
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <p style="margin-top: 15px; color: #666;">支持 PNG/JPG/BMP 格式，建议每张图包含4-6个配电箱</p>
+                <div class="preview-area" id="previewArea"></div>
+            </div>
+            
+            <div class="config-section">
+                <h3>⚙️ 配置选项</h3>
+                <div class="config-row">
+                    <div class="config-item">
+                        <label>元器件品牌偏好</label>
+                        <select id="brandSelect">
+                            <option value="both">ABB + 施耐德</option>
+                            <option value="abb">ABB</option>
+                            <option value="schneider">施耐德</option>
+                            <option value="abb_first">优先ABB</option>
+                        </select>
+                    </div>
+                    <div class="config-item">
+                        <label>数量核对方式</label>
+                        <select id="qtyMethod">
+                            <option value="auto">自动识别（从图片提取）</option>
+                            <option value="manual">手动输入</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="processBtn" disabled>
+                🔍 识别元器件并询价
+            </button>
+            
+            <div class="note">
+                <h4>📌 使用说明</h4>
+                <p>1. 上传配电箱系统图截图<br>
+                   2. 选择品牌偏好<br>
+                   3. 点击识别按钮<br>
+                   4. 查看元器件提取结果和询价<br>
+                   5. 点击下载Excel报价单</p>
+            </div>
+            
+            <div class="results-section" id="resultsSection">
+                <h2 style="margin-bottom: 20px; color: #1565c0;">📊 识别结果</h2>
+                
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <h4>配电箱数量</h4>
+                        <div class="value" id="boxCount">0</div>
+                    </div>
+                    <div class="summary-card green">
+                        <h4>元器件总数</h4>
+                        <div class="value" id="componentCount">0</div>
+                    </div>
+                    <div class="summary-card orange">
+                        <h4>报价总计</h4>
+                        <div class="value" id="totalPrice">¥0.00</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 15px;">📦 配电箱报价明细</h3>
+                <div id="quoteTables"></div>
+                
+                <div class="download-section">
+                    <h3>📥 下载报价单</h3>
+                    <p style="margin-top: 10px;">包含汇总表和各配电箱详细报价</p>
+                    <a class="download-btn" id="downloadBtn" href="#" download="配电箱报价单.xlsx">
+                        ⬇️ 下载 Excel 文件
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="processing-overlay" id="processingOverlay">
+        <div class="processing-box">
+            <div class="spinner"></div>
+            <h3 id="processingText">正在识别元器件...</h3>
+            <p style="color: #666; margin-top: 10px;">请稍候</p>
+        </div>
+    </div>
+
+    <script>
+        // 存储上传的图片和提取的数据
+        let uploadedImages = [];
+        let extractedData = [];
+        
+        // DOM元素
+        const imageInput = document.getElementById('imageInput');
+        const previewArea = document.getElementById('previewArea');
+        const processBtn = document.getElementById('processBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const processingOverlay = document.getElementById('processingOverlay');
+        const processingText = document.getElementById('processingText');
+        
+        // 图片上传处理
+        imageInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    uploadedImages.push(file);
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const div = document.createElement('div');
+                        div.className = 'preview-item';
+                        div.innerHTML = `
+                            <img src="${event.target.result}" alt="${file.name}">
+                            <span class="remove" onclick="removeImage(this, '${file.name}')">×</span>
+                        `;
+                        previewArea.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            updateProcessBtn();
+        });
+        
+        // 移除图片
+        function removeImage(element, filename) {
+            uploadedImages = uploadedImages.filter(f => f.name !== filename);
+            element.parentElement.remove();
+            updateProcessBtn();
+        }
+        
+        // 更新处理按钮状态
+        function updateProcessBtn() {
+            processBtn.disabled = uploadedImages.length === 0;
+        }
+        
+        // 模拟元器件数据库
+        const componentDB = {
+            'SH201': { name: '小型断路器', brand: 'ABB', basePrice: 50 },
+            'GSH201': { name: '漏电保护断路器', brand: 'ABB', basePrice: 180 },
+            'GSH202': { name: '漏电保护断路器', brand: 'ABB', basePrice: 220 },
+            'AX': { name: '交流接触器', brand: 'ABB', basePrice: 220 },
+            'CR-M': { name: '中间继电器', brand: 'ABB', basePrice: 85 },
+            'CR-P': { name: '中间继电器', brand: 'ABB', basePrice: 65 },
+            'TA': { name: '热过载继电器', brand: 'ABB', basePrice: 180 },
+            'XT': { name: '塑壳断路器', brand: 'ABB', basePrice: 800 },
+            'OT': { name: '隔离开关', brand: 'ABB', basePrice: 350 },
+            'iC65': { name: '小型断路器', brand: '施耐德', basePrice: 55 },
+            'LC1D': { name: '交流接触器', brand: '施耐德', basePrice: 200 },
+            'RXM': { name: '中间继电器', brand: '施耐德', basePrice: 75 },
+            'NSX': { name: '塑壳断路器', brand: '施耐德', basePrice: 750 },
+            'XB7': { name: '指示灯/按钮', brand: '施耐德', basePrice: 40 },
+            'default': { name: '电气元件', brand: 'ABB', basePrice: 100 }
+        };
+        
+        // 模拟的配电箱数据（从图片识别后会替换为真实数据）
+        const mockBoxData = [
+            {
+                name: 'CJL-1800',
+                size: '1800×600×400mm',
+                components: [
+                    { spec: 'SH201-C16', qty: 4, price: 52.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' },
+                    { spec: 'GSH201 AC-C20/0.03', qty: 2, price: 228.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' },
+                    { spec: 'AX09-30-10-80', qty: 2, price: 223.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' },
+                    { spec: 'CR-M024DC2L', qty: 4, price: 862.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' },
+                    { spec: 'TA25DU-19M', qty: 2, price: 238.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' }
+                ]
+            },
+            {
+                name: 'CJL-A&L-1',
+                size: '800×400×200mm',
+                components: [
+                    { spec: 'SH201-C10', qty: 8, price: 45.00, channel: 'ABB直通车', url: 'https://mall.abb.com.cn' },
+                    { spec: 'iC65N C10', qty: 4, price: 48.00, channel: '工控猫商城', url: 'https://www.gkmao.com' },
+                    { spec: 'RXM4LB2P7', qty: 8, price: 82.00, channel: '工控猫商城', url: 'https://www.gkmao.com' }
+                ]
+            },
+            {
+                name: 'L1AL1-BQ',
+                size: '600×400×200mm',
+                components: [
+                    { spec: 'iC65N C32', qty: 3, price: 75.00, channel: '工控猫商城', url: 'https://www.gkmao.com' },
+                    { spec: 'LC1D09M7', qty: 2, price: 175.00, channel: '工控猫商城', url: 'https://www.gkmao.com' },
+                    { spec: 'XB7EA5421', qty: 6, price: 45.00, channel: '天工直通车', url: 'https://www.titanmatrix.com' }
+                ]
+            }
+        ];
+        
+        // 处理按钮点击
+        processBtn.addEventListener('click', async function() {
+            processingOverlay.classList.add('active');
+            processingText.textContent = '正在分析配电箱系统图...';
+            
+            // 模拟处理延迟
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            processingText.textContent = '正在提取元器件信息...';
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            processingText.textContent = '正在查询价格...';
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            processingText.textContent = '正在生成报价单...';
+            
+            // 使用模拟数据（实际使用时这里会调用后端API）
+            extractedData = mockBoxData;
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            processingOverlay.classList.remove('active');
+            
+            // 显示结果
+            displayResults();
+        });
+        
+        // 显示结果
+        function displayResults() {
+            resultsSection.classList.add('active');
+            
+            // 计算汇总数据
+            let totalBoxes = extractedData.length;
+            let totalComponents = 0;
+            let totalPrice = 0;
+            
+            extractedData.forEach(box => {
+                totalComponents += box.components.length;
+                box.components.forEach(comp => {
+                    totalPrice += comp.price * comp.qty;
+                });
+            });
+            
+            document.getElementById('boxCount').textContent = totalBoxes;
+            document.getElementById('componentCount').textContent = totalComponents;
+            document.getElementById('totalPrice').textContent = '¥' + totalPrice.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            // 生成表格
+            let tablesHTML = '';
+            extractedData.forEach((box, boxIndex) => {
+                let boxTotal = 0;
+                box.components.forEach(comp => {
+                    boxTotal += comp.price * comp.qty;
+                });
+                
+                tablesHTML += `
+                    <div style="margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: linear-gradient(90deg, #1e88e5, #1565c0); color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: bold; font-size: 1.1rem;">📦 ${box.name}</span>
+                            <span>尺寸: ${box.size}</span>
+                        </div>
+                        <table class="quote-table">
+                            <thead>
+                                <tr>
+                                    <th>序号</th>
+                                    <th>元器件名称</th>
+                                    <th>规格型号</th>
+                                    <th>品牌</th>
+                                    <th>数量</th>
+                                    <th>单价(元)</th>
+                                    <th>小计(元)</th>
+                                    <th>询价来源</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                box.components.forEach((comp, idx) => {
+                    const compInfo = getComponentInfo(comp.spec);
+                    const subtotal = comp.price * comp.qty;
+                    
+                    tablesHTML += `
+                        <tr>
+                            <td>${idx + 1}</td>
+                            <td>${compInfo.name}</td>
+                            <td>${comp.spec}</td>
+                            <td>${compInfo.brand}</td>
+                            <td>${comp.qty}</td>
+                            <td class="price">¥${comp.price.toFixed(2)}</td>
+                            <td class="price">¥${subtotal.toFixed(2)}</td>
+                            <td class="link"><a href="${comp.url}" target="_blank">${comp.channel}</a></td>
+                        </tr>
+                    `;
+                });
+                
+                tablesHTML += `
+                                <tr style="background: #fff3e0;">
+                                    <td colspan="6"></td>
+                                    <td style="font-weight: bold; color: #f44336;">配电箱合计: ¥${boxTotal.toFixed(2)}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('quoteTables').innerHTML = tablesHTML;
+            
+            // 滚动到结果区域
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+            
+            // 生成Excel下载（实际需要后端生成，这里用模拟）
+            generateMockExcel();
+        }
+        
+        // 获取元器件信息
+        function getComponentInfo(spec) {
+            for (let key in componentDB) {
+                if (spec.includes(key)) {
+                    return componentDB[key];
+                }
+            }
+            return componentDB['default'];
+        }
+        
+        // 生成模拟Excel（实际需要后端生成）
+        function generateMockExcel() {
+            // 这里生成的是模拟数据，实际使用时需要通过后端API调用Python生成真实Excel
+            // 演示用的下载功能
+            console.log('Excel数据已准备好');
+        }
+    </script>
+</body>
+</html>
