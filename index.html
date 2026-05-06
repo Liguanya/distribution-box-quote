@@ -127,51 +127,47 @@
         <p class="loading-text">正在连接智能助手...</p>
     </div>
 
-    <!-- Coze WebSDK 脚本 (新版 API) -->
-    <script src="https://lf-cdn.coze.cn/obj/unpkg/latest/coze/web-sdk/dist/js-umd/index.min.js"></script>
+    <!-- Coze Chat SDK -->
+    <script src="https://lf-cdn.coze.cn/obj/unpkg-va/flow-platform/chat-app-sdk/latest/libs/cn/index.js"></script>
     <script>
-        // 初始化 Coze WebSDK
-        cozeWebSDK.init({
-            // 项目ID (从 Coze 编程平台获取)
-            projectId: '7636692855800610831',
-            
-            // 访问令牌 (需要替换为你的 PAT)
-            // 获取方式: https://www.coze.cn/open/oauth/pats
-            refreshToken: () => {
-                return 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5';
+        // 初始化 Chat SDK - 使用标准智能体
+        const cozeWebSDK = new CozeWebSDK.WebChatClient({
+            config: {
+                botId: '7636708997047091219',
             },
-            
-            // 挂载容器
-            container: document.getElementById('coze-chat-container'),
-            
-            // 界面主题
-            theme: 'light',
-            
-            // 容器样式
-            style: 'width: 100%; height: 650px; border-radius: 12px; overflow: hidden;',
-            
-            // 成功回调
-            onIframeReady: function() {
-                console.log('Coze WebSDK 已就绪');
-                // 隐藏加载提示
-                document.getElementById('loading-overlay').style.display = 'none';
+            auth: {
+                type: 'token',
+                token: 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5',
+                onRefreshToken: async () => 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5',
             },
-            
-            // 错误回调
-            onNetworkError: function() {
-                console.error('网络连接错误');
-                document.querySelector('.loading-text').textContent = '网络连接失败，请刷新页面重试';
+            userInfo: {
+                id: 'user_' + Date.now(),
+                nickname: '用户',
             },
-            
-            onTokenExpired: function() {
-                console.log('Token 已过期，正在刷新...');
+            ui: {
+                base: {
+                    layout: 'pc',
+                    lang: 'zh-CN',
+                },
+                asstBtn: {
+                    isNeed: false,
+                },
+                header: {
+                    isShow: true,
+                    isNeedClose: false,
+                },
+                footer: {
+                    isShow: false,
+                },
             },
-            
-            onTokenInvalid: function() {
-                console.error('Token 无效，请检查配置');
-                document.querySelector('.loading-text').textContent = '认证失败，请检查 Token 配置';
-            }
+            chatBot: {
+                el: document.getElementById('coze-chat-container'),
+                title: '配电箱智能识别助手',
+            },
         });
+
+        // SDK 加载完成，隐藏加载提示
+        document.getElementById('loading-overlay').style.display = 'none';
     </script>
 </body>
 </html>
