@@ -3,1094 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ 配电箱自动组价系统 V4 - 智能识别版</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 { font-size: 2.2rem; margin-bottom: 10px; }
-        .header .subtitle { opacity: 0.9; font-size: 1.1rem; }
-        .content { padding: 30px; }
-        
-        /* 功能说明 */
-        .info-box {
-            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 25px;
-            border-left: 5px solid #4caf50;
-        }
-        .info-box h3 { color: #2e7d32; margin-bottom: 15px; font-size: 1.2rem; }
-        .info-box ul { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
-        .info-box li { padding: 8px 0; color: #333; display: flex; align-items: center; gap: 8px; }
-        .info-box li::before { content: "✓ "; color: #4caf50; font-weight: bold; }
-        
-        /* 上传区域 */
-        .upload-section {
-            border: 3px dashed #667eea;
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
-            margin-bottom: 25px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .upload-section:hover { border-color: #764ba2; background: linear-gradient(135deg, #f0f4ff 0%, #e8ecff 100%); transform: scale(1.01); }
-        .upload-section.dragover { border-color: #4caf50; background: #e8f5e9; }
-        .upload-section input[type="file"] { display: none; }
-        
-        .upload-btn {
-            display: inline-block;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 40px;
-            border-radius: 30px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-        .upload-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5); }
-        
-        .preview-area {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-top: 20px;
-            justify-content: center;
-        }
-        .preview-item {
-            position: relative;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            overflow: hidden;
-            background: white;
-        }
-        .preview-item img { max-width: 180px; max-height: 180px; display: block; }
-        .preview-item .remove-btn {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: rgba(244,67,54,0.9);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .preview-item .filename { background: #f5f5f5; padding: 5px 10px; font-size: 12px; color: #666; text-align: center; }
-        
-        /* 示例数据按钮 */
-        .demo-btn {
-            background: linear-gradient(90deg, #43a047 0%, #2e7d32 100%);
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1rem;
-            margin-left: 15px;
-            box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
-        }
-        .demo-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(67, 160, 71, 0.4); }
-        
-        /* 识别按钮 */
-        .action-btn {
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(90deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 1.3rem;
-            cursor: pointer;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(238, 90, 36, 0.4);
-        }
-        .action-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
-        .action-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(238, 90, 36, 0.5); }
-        
-        /* 进度条 */
-        .ocr-progress { display: none; background: #fff3e0; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-        .ocr-progress.active { display: block; }
-        .progress-bar { background: #e0e0e0; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 10px; }
-        .progress-fill { background: linear-gradient(90deg, #ff9800 0%, #ff5722 100%); height: 100%; width: 0%; transition: width 0.3s; }
-        .progress-text { text-align: center; color: #666; font-weight: 500; }
-        
-        /* 日志 */
-        .log-section { background: #1a1a2e; border-radius: 10px; padding: 15px; margin-bottom: 20px; max-height: 250px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 13px; display: none; }
-        .log-section.active { display: block; }
-        .log-item { padding: 5px 0; border-bottom: 1px solid #333; color: #0f0; }
-        .log-item:last-child { border-bottom: none; }
-        .log-success { color: #4caf50; }
-        .log-error { color: #f44336; }
-        .log-info { color: #2196f3; }
-        .log-warning { color: #ff9800; }
-        .log-section::-webkit-scrollbar { width: 8px; }
-        .log-section::-webkit-scrollbar-track { background: #333; border-radius: 4px; }
-        .log-section::-webkit-scrollbar-thumb { background: #667eea; border-radius: 4px; }
-        
-        /* 结果区域 */
-        .results-section { display: none; }
-        .results-section.active { display: block; }
-        
-        /* ========== 树状报价单格式（核心升级）========== */
-        .quote-output {
-            background: #fafafa;
-            border: 2px solid #e0e0e0;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 25px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
-            line-height: 1.8;
-            white-space: pre-wrap;
-            overflow-x: auto;
-        }
-        
-        .quote-output .box-header {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            margin: 20px 0 15px 0;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-        
-        .quote-output .box-header:first-child { margin-top: 0; }
-        
-        .quote-output .component-line {
-            padding: 6px 0 6px 30px;
-            border-left: 2px solid #e0e0e0;
-            margin-left: 15px;
-            position: relative;
-        }
-        .quote-output .component-line::before {
-            content: "├── ";
-            position: absolute;
-            left: 0;
-            color: #999;
-        }
-        .quote-output .component-line:last-child::before { content: "└── "; }
-        
-        .quote-output .component-name { color: #333; font-weight: 600; }
-        .quote-output .component-model { background: #e3f2fd; padding: 2px 8px; border-radius: 4px; color: #1565c0; font-family: 'Consolas', monospace; }
-        .quote-output .component-price { color: #e53935; font-weight: bold; }
-        .quote-output .component-link { color: #4caf50; text-decoration: none; font-size: 12px; }
-        .quote-output .component-link:hover { text-decoration: underline; }
-        
-        .quote-output .box-price-line { padding: 8px 0 8px 30px; color: #4caf50; font-weight: 600; margin-left: 15px; border-left: 2px solid #4caf50; }
-        .quote-output .box-total-line { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            color: white; 
-            padding: 12px 20px; 
-            border-radius: 8px; 
-            margin-top: 15px;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-        
-        /* 表格视图 */
-        .table-view { display: none; }
-        .table-view.active { display: block; }
-        
-        /* 配电箱卡片 */
-        .box-card {
-            background: #fff;
-            border: 2px solid #e0e0e0;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        .box-card-header {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 25px;
-        }
-        .box-card-header .title-row { display: flex; align-items: center; gap: 15px; margin-bottom: 8px; }
-        .box-card-header h3 { font-size: 1.5rem; margin: 0; }
-        .box-card-header .box-meta { display: flex; gap: 25px; font-size: 0.95rem; opacity: 0.95; flex-wrap: wrap; }
-        .box-card-header .box-meta span { display: flex; align-items: center; gap: 5px; }
-        .box-card-body { padding: 0; }
-        
-        /* 报价表格 */
-        .quote-section { padding: 20px 25px; }
-        .quote-section-title { font-size: 1rem; font-weight: 600; color: #333; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #667eea; }
-        .quote-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-        .quote-table th { background: #f8f9fa; color: #333; padding: 12px 15px; text-align: center; font-weight: 600; border: 1px solid #dee2e6; }
-        .quote-table th:first-child { text-align: left; }
-        .quote-table td { padding: 12px 15px; border: 1px solid #dee2e6; text-align: center; }
-        .quote-table td:first-child { text-align: center; }
-        .quote-table td:nth-child(2) { text-align: left; }
-        .quote-table td:nth-child(4) { text-align: left; max-width: 200px; word-break: break-all; }
-        .quote-table .price { color: #e53935; font-weight: bold; }
-        .quote-table .model { font-family: "Consolas", "Monaco", monospace; background: #e3f2fd; padding: 4px 10px; border-radius: 4px; font-size: 0.9rem; display: inline-block; }
-        .quote-table .source-link { color: #4caf50; text-decoration: none; font-size: 12px; display: inline-block; margin-left: 5px; }
-        .quote-table .source-link:hover { text-decoration: underline; }
-        
-        .subtotal-row { background: #fff8e1 !important; font-weight: 600; }
-        .subtotal-row td { border-top: 2px solid #ffc107; }
-        .box-row { background: #e8f5e9 !important; font-weight: 600; }
-        .box-row td { border-top: 2px solid #4caf50; }
-        
-        /* 合计 */
-        .box-total { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; }
-        .box-total .label { font-size: 1.1rem; }
-        .box-total .amount { font-size: 1.6rem; font-weight: bold; }
-        
-        /* 总汇总 */
-        .grand-total {
-            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 15px;
-            margin-top: 30px;
-            display: flex;
-            justify-content: space-around;
-            text-align: center;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        .grand-total-item h4 { font-size: 0.9rem; opacity: 0.9; margin-bottom: 5px; }
-        .grand-total-item .value { font-size: 2rem; font-weight: bold; }
-        
-        /* 视图切换 */
-        .view-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
-        .view-toggle button { padding: 10px 20px; border: 2px solid #667eea; background: white; color: #667eea; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
-        .view-toggle button.active { background: #667eea; color: white; }
-        .view-toggle button:hover:not(.active) { background: #f0f0ff; }
-        
-        /* 导出按钮 */
-        .export-btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(90deg, #ff9800 0%, #f57c00 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .header h1 { font-size: 1.5rem; }
-            .box-card-header .box-meta { gap: 10px; }
-            .grand-total { flex-direction: column; }
-            .quote-table { font-size: 0.85rem; }
-            .quote-table th, .quote-table td { padding: 8px 6px; }
-            .view-toggle { flex-wrap: wrap; }
-            .view-toggle button { flex: 1; min-width: 120px; }
-        }
-    </style>
+    <title>配电箱智能识别报价系统</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>⚡ 配电箱自动组价系统 V4</h1>
-            <p class="subtitle">AI智能识别 · 可靠报价来源 · 清晰树状输出</p>
+    <!-- 顶部导航 -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <h1>配电箱智能识别报价系统</h1>
+            </div>
+            <nav class="nav">
+                <a href="#features">功能介绍</a>
+                <a href="#usage">使用说明</a>
+                <a href="#contact">联系我们</a>
+            </nav>
         </div>
-        
-        <div class="content">
-            <div class="info-box">
-                <h3>🔧 功能升级说明</h3>
-                <ul>
-                    <li><strong>智能识别</strong>：自动识别配电箱名称、尺寸和元器件</li>
-                    <li><strong>树状输出</strong>：按要求格式清晰展示每个配电箱</li>
-                    <li><strong>可靠来源</strong>：每个元器件附施耐德/ABB/京东等官方链接</li>
-                    <li><strong>独立组价</strong>：每个配电箱单独计算造价</li>
-                    <li><strong>人工费</strong>：含15%人工费和管理费</li>
-                    <li><strong>示例数据</strong>：可一键加载示例配电箱系统图</li>
-                </ul>
+    </header>
+
+    <!-- 横幅区域 -->
+    <section class="banner">
+        <div class="banner-content">
+            <h2>AI智能识别 · 秒级报价</h2>
+            <p>上传配电箱系统图，AI自动识别元器件，快速生成标准报价表</p>
+        </div>
+    </section>
+
+    <!-- 核心功能区 -->
+    <section class="main-content">
+        <div class="sdk-container">
+            <div class="sdk-header">
+                <span class="sdk-status">
+                    <span class="status-dot"></span>
+                    在线服务
+                </span>
+                <span class="sdk-title">智能对话窗口</span>
             </div>
-            
-            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 25px;">
-                <div class="upload-section" id="uploadSection" style="flex: 1; min-width: 300px; margin-bottom: 0; padding: 25px;">
-                    <label class="upload-btn" for="imageInput">
-                        📤 点击上传配电箱系统图（支持多选）
-                    </label>
-                    <input type="file" id="imageInput" accept="image/*" multiple>
-                    <p style="margin-top: 10px; color: #666; font-size: 0.9rem;">支持 PNG/JPG/BMP 格式，建议上传清晰原图</p>
-                    <div class="preview-area" id="previewArea"></div>
+            <div id="coze-chat-container"></div>
+        </div>
+
+        <!-- 功能说明 -->
+        <div class="features" id="features">
+            <h3 class="section-title">核心功能</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📤</div>
+                    <h4>图片上传</h4>
+                    <p>支持上传配电箱系统图、电气原理图，自动识别元器件</p>
                 </div>
-                <button class="demo-btn" onclick="loadDemoData()">📋 加载示例数据</button>
-            </div>
-            
-            <div class="ocr-progress" id="ocrProgress">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h4>智能识别</h4>
+                    <p>AI自动识别断路器、接触器、继电器等电气元器件</p>
                 </div>
-                <div class="progress-text" id="progressText">正在加载OCR引擎...</div>
-            </div>
-            
-            <div class="log-section" id="logSection">
-                <div id="logContent"></div>
-            </div>
-            
-            <button class="action-btn" id="processBtn" disabled onclick="startRecognition()">
-                🔍 开始AI识别配电箱
-            </button>
-            
-            <div class="results-section" id="resultsSection">
-                <div class="view-toggle">
-                    <button class="active" onclick="switchView('tree')">🌳 树状视图</button>
-                    <button onclick="switchView('table')">📊 表格视图</button>
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h4>标准报价</h4>
+                    <p>根据识别结果自动匹配市场价，生成完整元器件报价清单</p>
                 </div>
-                
-                <!-- 树状输出 -->
-                <div class="quote-output" id="treeView"></div>
-                
-                <!-- 表格视图 -->
-                <div class="table-view" id="tableView">
-                    <div id="boxesContainer"></div>
+                <div class="feature-card">
+                    <div class="feature-icon">✏️</div>
+                    <h4>在线修正</h4>
+                    <p>支持对识别结果进行人工修正和补充调整</p>
                 </div>
-                
-                <div class="grand-total" id="grandTotal"></div>
-                <button class="export-btn" onclick="exportToExcel()">📥 导出完整报价单 (CSV)</button>
             </div>
         </div>
+
+        <!-- 使用说明 -->
+        <div class="usage-guide" id="usage">
+            <h3 class="section-title">使用说明</h3>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>上传配电箱图片</h4>
+                        <p>点击对话窗口左侧的图片上传按钮，选择配电箱系统图或电气原理图</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>AI智能识别</h4>
+                        <p>系统自动分析图片内容，识别其中的电气元器件及规格参数</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>生成报价表</h4>
+                        <p>根据识别结果自动匹配市场价，生成完整的元器件报价清单</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>核对与导出</h4>
+                        <p>核对报价内容，如有问题可在线修正，确认无误后导出使用</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 底部信息 -->
+    <footer class="footer" id="contact">
+        <div class="footer-content">
+            <div class="footer-info">
+                <p>Powered by <strong>Coze AI</strong> · 智能体识别报价系统</p>
+                <p class="copyright">© 2024 配电箱智能识别报价系统 · 专业电气工程解决方案</p>
+            </div>
+            <div class="footer-contact">
+                <p>技术支持：李冠亚</p>
+                <p>项目预览：<a href="https://code.coze.cn/p/7636692855800610831/preview" target="_blank">查看原项目</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 加载提示 -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">正在连接智能助手...</p>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <!-- Coze WebSDK 脚本 (新版 API) -->
+    <script src="https://lf-cdn.coze.cn/obj/unpkg/latest/coze/web-sdk/dist/js-umd/index.min.js"></script>
     <script>
-        // ========== 全局变量 ==========
-        let uploadedImages = [];
-        let recognitionResults = { boxes: [], grandTotal: 0 };
-        let worker = null;
-        let currentView = 'tree';
-        
-        // ========== DOM元素 ==========
-        const imageInput = document.getElementById('imageInput');
-        const uploadSection = document.getElementById('uploadSection');
-        const previewArea = document.getElementById('previewArea');
-        const processBtn = document.getElementById('processBtn');
-        const ocrProgress = document.getElementById('ocrProgress');
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        const logSection = document.getElementById('logSection');
-        const logContent = document.getElementById('logContent');
-        
-        // ========== 可靠报价来源链接（核心升级）==========
-        const PRICE_SOURCES = {
-            // 施耐德元器件
-            'INT': [
-                { name: '京东自营旗舰店', url: 'https://mall.jd.com/index-1000000158.html' },
-                { name: '1688官方旗舰店', url: 'https://detail.1688.com/offer/xxx.html' },
-                { name: '天猫旗舰店', url: 'https://schneiderelectric.tmall.com/' }
-            ],
-            'iC65N': [
-                { name: '京东自营店', url: 'https://mall.jd.com/index-1000000158.html' },
-                { name: '1688官方旗舰店', url: 'https://www.1688.com/chanpin/-CAA9C4CDB5C2B5CDD1B9B5E7C6F7B2FAC6B7.html' },
-                { name: '天猫旗舰店', url: 'https://schneiderelectric.tmall.com/' }
-            ],
-            'LiD': [
-                { name: '京东自营店', url: 'https://mall.jd.com/index-1000000158.html' },
-                { name: '工控猫商城', url: 'https://www.gongkongma.com/' },
-                { name: '天猫旗舰店', url: 'https://schneiderelectric.tmall.com/' }
-            ],
-            'iCT': [
-                { name: '京东自营店', url: 'https://mall.jd.com/index-1000000158.html' },
-                { name: '1688官方旗舰店', url: 'https://www.1688.com/chanpin/-CAA9C4CDB5C2B5E7C6F7C5E4BCFE.html' }
-            ],
-            'WTS': [
-                { name: '京东施耐德万高', url: 'https://mall.jd.com/index-1000000158.html' },
-                { name: '工控猫商城', url: 'https://www.gongkongma.com/' }
-            ],
-            'KWH': [
-                { name: '京东工业品', url: 'https://jiage.jd.com/' },
-                { name: '1688工业品', url: 'https://www.1688.com/' }
-            ],
-            // ABB元器件
-            'SH': [
-                { name: 'ABB京东自营旗舰店', url: 'https://mall.jd.com/index-16562938.html' },
-                { name: 'ABB官方', url: 'https://new.abb.com/cn' }
-            ],
-            'OT': [
-                { name: 'ABB京东自营旗舰店', url: 'https://mall.jd.com/index-16562938.html' },
-                { name: '1688 ABB官方', url: 'https://www.1688.com/' }
-            ],
-            // 通用元器件
-            'default': [
-                { name: '京东工业品', url: 'https://jiage.jd.com/' },
-                { name: '1688工业品', url: 'https://www.1688.com/' },
-                { name: '工控猫商城', url: 'https://www.gongkongma.com/' }
-            ]
-        };
-        
-        // 获取元器件的报价来源
-        function getPriceSources(model) {
-            for (const [key, sources] of Object.entries(PRICE_SOURCES)) {
-                if (key !== 'default' && model.toUpperCase().includes(key)) {
-                    return sources;
-                }
+        // 初始化 Coze WebSDK
+        cozeWebSDK.init({
+            // 项目ID (从 Coze 编程平台获取)
+            projectId: '7636692855800610831',
+            
+            // 访问令牌 (需要替换为你的 PAT)
+            // 获取方式: https://www.coze.cn/open/oauth/pats
+            refreshToken: () => {
+                return 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5';
+            },
+            
+            // 挂载容器
+            container: document.getElementById('coze-chat-container'),
+            
+            // 界面主题
+            theme: 'light',
+            
+            // 容器样式
+            style: 'width: 100%; height: 650px; border-radius: 12px; overflow: hidden;',
+            
+            // 成功回调
+            onIframeReady: function() {
+                console.log('Coze WebSDK 已就绪');
+                // 隐藏加载提示
+                document.getElementById('loading-overlay').style.display = 'none';
+            },
+            
+            // 错误回调
+            onNetworkError: function() {
+                console.error('网络连接错误');
+                document.querySelector('.loading-text').textContent = '网络连接失败，请刷新页面重试';
+            },
+            
+            onTokenExpired: function() {
+                console.log('Token 已过期，正在刷新...');
+            },
+            
+            onTokenInvalid: function() {
+                console.error('Token 无效，请检查配置');
+                document.querySelector('.loading-text').textContent = '认证失败，请检查 Token 配置';
             }
-            return PRICE_SOURCES['default'];
-        }
-        
-        // ========== 示例数据 ==========
-        function loadDemoData() {
-            const demoBoxes = [
-                {
-                    name: '1JAL2-KS',
-                    size: '400×300×100mm',
-                    components: [
-                        { name: '隔离开关', model: 'INT-63A 3P', brand: '施耐德', price: 120, count: 1 },
-                        { name: '浪涌保护器', model: 'LiD 40/4 40kA', brand: '施耐德', price: 180, count: 1 },
-                        { name: '微型断路器', model: 'iC65N-C20A/2P', brand: '施耐德', price: 85, count: 3 },
-                        { name: '微型断路器', model: 'iC65N-D25A/4P', brand: '施耐德', price: 95, count: 1 },
-                        { name: '漏电保护附件', model: 'Vigi iC65 30mA', brand: '施耐德', price: 145, count: 1 }
-                    ]
-                },
-                {
-                    name: '2AL1-KS',
-                    size: '500×400×120mm',
-                    components: [
-                        { name: '塑壳断路器', model: 'NSX100N TM40D 3P', brand: '施耐德', price: 580, count: 1 },
-                        { name: '微型断路器', model: 'iC65N-C32A/2P', brand: '施耐德', price: 88, count: 4 },
-                        { name: '小型断路器', model: 'SH201-C16A/1P', brand: 'ABB', price: 45, count: 2 },
-                        { name: '隔离开关', model: 'OT63E3C', brand: 'ABB', price: 110, count: 1 },
-                        { name: '浪涌保护器', model: 'SPD 40kA', brand: '施耐德', price: 180, count: 1 },
-                        { name: '电流互感器', model: 'iCT 100/5A', brand: '施耐德', price: 85, count: 3 },
-                        { name: '多功能电力仪表', model: 'KWH+', brand: '通用', price: 320, count: 1 }
-                    ]
-                },
-                {
-                    name: '3APE-XK',
-                    size: '600×400×150mm',
-                    components: [
-                        { name: '双电源转换开关', model: 'WTS-B63/4P', brand: '施耐德万高', price: 680, count: 1 },
-                        { name: '塑壳断路器', model: 'NSX160N TM80D 3P', brand: '施耐德', price: 720, count: 2 },
-                        { name: '交流接触器', model: 'LC1D95M7C', brand: '施耐德', price: 265, count: 2 },
-                        { name: '热继电器', model: 'LRD10N', brand: '施耐德', price: 95, count: 2 },
-                        { name: '时间继电器', model: 'WCR1', brand: '通用', price: 85, count: 2 },
-                        { name: '信号指示灯', model: '信号灯 AD', brand: '通用', price: 15, count: 6 },
-                        { name: '控制按钮', model: '按钮', brand: '通用', price: 12, count: 4 }
-                    ]
-                }
-            ];
-            
-            showResults(demoBoxes);
-            addLog('已加载示例数据', 'success');
-        }
-        
-        // ========== 日志功能 ==========
-        function addLog(message, type = 'info') {
-            const div = document.createElement('div');
-            div.className = `log-item log-${type}`;
-            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logContent.appendChild(div);
-            logSection.scrollTop = logSection.scrollHeight;
-            logSection.classList.add('active');
-        }
-        
-        // ========== 文件上传 ==========
-        imageInput.addEventListener('change', function(e) { handleFiles(e.target.files); });
-        uploadSection.addEventListener('dragover', e => { e.preventDefault(); uploadSection.classList.add('dragover'); });
-        uploadSection.addEventListener('dragleave', e => { e.preventDefault(); uploadSection.classList.remove('dragover'); });
-        uploadSection.addEventListener('drop', e => { e.preventDefault(); uploadSection.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
-        
-        function handleFiles(files) {
-            Array.from(files).forEach(file => {
-                if (file.type.startsWith('image/')) {
-                    uploadedImages.push(file);
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        const div = document.createElement('div');
-                        div.className = 'preview-item';
-                        div.innerHTML = `<img src="${event.target.result}" alt="${file.name}"><button class="remove-btn" onclick="removeImage('${file.name}', this)">×</button><div class="filename">${file.name}</div>`;
-                        previewArea.appendChild(div);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-            processBtn.disabled = uploadedImages.length === 0;
-        }
-        
-        function removeImage(filename, btn) {
-            uploadedImages = uploadedImages.filter(f => f.name !== filename);
-            btn.parentElement.remove();
-            processBtn.disabled = uploadedImages.length === 0;
-        }
-        
-        // ========== 视图切换 ==========
-        function switchView(view) {
-            currentView = view;
-            document.querySelectorAll('.view-toggle button').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent.includes(view === 'tree' ? '树状' : '表格'));
-            });
-            document.getElementById('treeView').style.display = view === 'tree' ? 'block' : 'none';
-            document.getElementById('tableView').classList.toggle('active', view === 'table');
-        }
-        
-        // ========== 配电箱名称识别（升级版）==========
-        const BOX_NAME_PATTERNS = [
-            // 标准命名: 数字+字母组合-KS结尾 (如 1JAL2-KS, 2AL1-KS)
-            /(\d[A-Z]{2,6}[-_]?KS)/gi,
-            // APE-XK格式
-            /(\d?APE[-_]?XK)/gi,
-            // AL-XX格式 (如 1AL-01)
-            /(\dAL[-_]?\d{1,2})/gi,
-            // JAL格式 (如 1JAL2)
-            /(\dJAL\d)/gi,
-            // 任意配电箱标识 (含有配电箱关键词)
-            /(?:配电箱|配电柜|PEN箱|电箱)[：:\s]*([A-Z0-9\-_]+)/gi,
-            // 常见配电箱命名模式
-            /([A-Z]{1,3}\d{1,2}[-_][A-Z]{1,3})/gi
-        ];
-        
-        function extractBoxNames(text) {
-            const names = [];
-            const seen = new Set();
-            
-            for (const pattern of BOX_NAME_PATTERNS) {
-                pattern.lastIndex = 0;
-                let match;
-                while ((match = pattern.exec(text)) !== null) {
-                    let name = match[1] || match[0];
-                    name = name.replace(/[-_\s]+/g, '').toUpperCase();
-                    
-                    // 验证是否是有效的配电箱名称
-                    if (isValidBoxName(name) && !seen.has(name)) {
-                        seen.add(name);
-                        names.push({ name: name, position: match.index });
-                    }
-                }
-            }
-            
-            // 按位置排序
-            names.sort((a, b) => a.position - b.position);
-            return names;
-        }
-        
-        function isValidBoxName(name) {
-            const upper = name.toUpperCase();
-            if (upper.length < 3 || upper.length > 15) return false;
-            
-            // 排除元器件型号
-            const excludedModels = ['SPD', 'CT', 'DM', 'KWH', 'INT', 'OT', 'WTS', 'LC', 'LR', 'LA', 'NS', 'RT', 'ICT', 'IC65', 'SH', 'VE', 'WCR'];
-            if (excludedModels.some(m => upper === m || upper.startsWith(m))) return false;
-            
-            // 排除回路标识
-            if (/^L\d+$/i.test(upper) || upper === 'N' || upper === 'PE') return false;
-            
-            // 必须包含字母和数字
-            const hasLetterAndNumber = /[A-Z]/.test(upper) && /\d/.test(upper);
-            return hasLetterAndNumber;
-        }
-        
-        // ========== 元器件识别规则（升级版）==========
-        const COMPONENT_PATTERNS = [
-            // 1. 隔离开关 - 施耐德 INT (最优先)
-            { pattern: /INT\s*(\d+)\s*[\\/]\s*(\d+)\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '隔离开关', brand: '施耐德', unit: '个', price: 120 } },
-            
-            // 2. 漏电保护断路器 - iC65N + VE
-            { pattern: /iC65N\s*[-_]?\s*[CD]?\s*(\d{2})\s*[\\/]\s*(\d+)\s*P\s*\+\s*VE\s*[\/\\]?\s*(\d+)\s*mA/gi,
-              info: { name: '漏电保护断路器', brand: '施耐德', unit: '个', price: 145 } },
-            { pattern: /iC65N\s*[-_]?\s*[CD]?\s*(\d{2})\s*[\\/]\s*(\d+)\s*P\s*\+\s*VE/gi,
-              info: { name: '漏电保护断路器', brand: '施耐德', unit: '个', price: 145 } },
-            
-            // 3. 微型断路器 - iC65N C型
-            { pattern: /iC65N\s*[-_]?\s*C\s*(\d{2})\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '微型断路器', brand: '施耐德', unit: '个', price: 85 } },
-            
-            // 4. 微型断路器 - iC65N D型
-            { pattern: /iC65N\s*[-_]?\s*D\s*(\d{2,3})\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '微型断路器', brand: '施耐德', unit: '个', price: 88 } },
-            
-            // 5. 通用iC65N格式
-            { pattern: /iC65N\s*[-_]?\s*[A-Z]?\s*(\d{2,3})\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '微型断路器', brand: '施耐德', unit: '个', price: 85 } },
-            
-            // 6. ABB小型断路器 - SH201
-            { pattern: /SH\s*201[N]?\s*[-_]?\s*[A-Z]?\s*(\d{2})\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '小型断路器', brand: 'ABB', unit: '个', price: 75 } },
-            
-            // 7. ABB隔离开关 - OT
-            { pattern: /OT\s*(\d+)E?\s*[\\/]?\s*(\d+)?\s*P?C?/gi,
-              info: { name: '隔离开关', brand: 'ABB', unit: '个', price: 110 } },
-            
-            // 8. 双电源转换开关 - WTS
-            { pattern: /WTS\s*[-_]?\s*B\s*(\d+)\s*[\\/]\s*(\d+)\s*P/gi,
-              info: { name: '双电源转换开关', brand: '施耐德万高', unit: '个', price: 680 } },
-            
-            // 9. 浪涌保护器 - LiD
-            { pattern: /LiD\s*(\d+)\s*[\/]\s*(\d+)\s*(?:(\d+)kA)?/gi,
-              info: { name: '浪涌保护器', brand: '施耐德', unit: '个', price: 180 } },
-            { pattern: /SPD\s*(\d+)\s*kA/gi,
-              info: { name: '浪涌保护器', brand: '施耐德', unit: '个', price: 180 } },
-            
-            // 10. 电流互感器 - iCT
-            { pattern: /iCT\s*(\d+)\s*[\\/]\s*(\d+)\s*A?/gi,
-              info: { name: '电流互感器', brand: '施耐德', unit: '个', price: 85 } },
-            { pattern: /(?<![A-Za-z0-9])(\d{2,3})\s*[\/]\s*5\s*A?(?![\/\\])/gi,
-              info: { name: '电流互感器', brand: '通用', unit: '个', price: 45 } },
-            
-            // 11. 多功能电力仪表 - KWH+
-            { pattern: /KWH\s*\+?/gi,
-              info: { name: '多功能电力仪表', brand: '通用', unit: '个', price: 320 } },
-            
-            // 12. 塑壳断路器 - NSX
-            { pattern: /NSX?\s*(\d+)[N]?\s*(?:TM)?(\d+)[A-Z]?\s*(\d+)\s*P/gi,
-              info: { name: '塑壳断路器', brand: '施耐德', unit: '个', price: 580 } },
-            
-            // 13. 交流接触器 - LC1D
-            { pattern: /LC\s*1?\s*D?\s*(\d+)[A-Z]?\s*M?\s*(\d+)C?/gi,
-              info: { name: '交流接触器', brand: '施耐德', unit: '个', price: 85 } },
-            
-            // 14. 热继电器 - LRD
-            { pattern: /LR\s*[D]?\s*(\d+)[A-Z]?\s*N?/gi,
-              info: { name: '热继电器', brand: '施耐德', unit: '个', price: 95 } },
-            
-            // 15. 时间继电器
-            { pattern: /WCR\s*\d*/gi,
-              info: { name: '时间继电器', brand: '通用', unit: '个', price: 85 } },
-            { pattern: /时间继电器/gi,
-              info: { name: '时间继电器', brand: '通用', unit: '个', price: 85 } },
-            
-            // 16. 指示灯
-            { pattern: /信号灯\s*([A-Z])?/gi,
-              info: { name: '信号指示灯', brand: '通用', unit: '个', price: 15 } },
-            
-            // 17. 按钮
-            { pattern: /按钮/gi,
-              info: { name: '控制按钮', brand: '通用', unit: '个', price: 12 } },
-            
-            // 18. 熔断器
-            { pattern: /RT\s*28|熔断器/gi,
-              info: { name: '熔断器', brand: '通用', unit: '个', price: 8 } }
-        ];
-        
-        function extractComponents(text) {
-            const components = [];
-            const usedRanges = [];
-            
-            for (const rule of COMPONENT_PATTERNS) {
-                rule.pattern.lastIndex = 0;
-                let match;
-                while ((match = rule.pattern.exec(text)) !== null) {
-                    const startPos = match.index;
-                    const endPos = startPos + match[0].length;
-                    
-                    // 检查是否与已匹配范围重叠
-                    let overlap = false;
-                    for (const range of usedRanges) {
-                        if (startPos < range.end && endPos > range.start) {
-                            overlap = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!overlap) {
-                        usedRanges.push({ start: startPos, end: endPos });
-                        const model = match[0].replace(/\s+/g, '');
-                        components.push({
-                            name: rule.info.name,
-                            brand: rule.info.brand,
-                            model: model,
-                            unit: rule.info.unit,
-                            price: rule.info.price,
-                            count: 1,
-                            position: startPos
-                        });
-                    }
-                }
-            }
-            
-            // 合并相同型号
-            const merged = [];
-            const modelMap = {};
-            components.forEach(comp => {
-                if (modelMap[comp.model]) {
-                    modelMap[comp.model].count++;
-                } else {
-                    modelMap[comp.model] = { ...comp };
-                    merged.push(modelMap[comp.model]);
-                }
-            });
-            
-            return merged;
-        }
-        
-        // ========== 尺寸识别 ==========
-        function extractBoxSize(text) {
-            const sizeMatch = text.match(/(\d{2,4})\s*[×xX\*]\s*(\d{2,4})\s*[×xX\*]\s*(\d{2,4})/);
-            if (sizeMatch) {
-                return `${sizeMatch[1]}×${sizeMatch[2]}×${sizeMatch[3]}mm`;
-            }
-            return null;
-        }
-        
-        // 添加元器件到配电箱
-        function addComponentToBox(box, component) {
-            const existing = box.components.find(c => c.model === component.model);
-            if (existing) {
-                existing.count += component.count;
-            } else {
-                box.components.push({ ...component });
-            }
-            box.subtotal += component.price * component.count;
-        }
-        
-        // ========== 按图片解析配电箱 ==========
-        function parseBoxesPerImage(text, imageIndex, fileName) {
-            const boxes = [];
-            
-            // 1. 识别配电箱名称
-            const boxNames = extractBoxNames(text);
-            addLog(`图片${imageIndex} - 识别到 ${boxNames.length} 个配电箱`, 'info');
-            boxNames.forEach(b => addLog(`  ✅ ${b.name}`, 'success'));
-            
-            // 2. 识别元器件
-            const components = extractComponents(text);
-            addLog(`  识别到 ${components.length} 种元器件`, 'info');
-            
-            // 3. 识别尺寸
-            const boxSize = extractBoxSize(text);
-            if (boxSize) {
-                addLog(`  📐 尺寸: ${boxSize}`, 'info');
-            }
-            
-            // 4. 创建配电箱并分配元器件
-            if (boxNames.length > 0) {
-                boxNames.forEach(info => {
-                    boxes.push({
-                        name: info.name,
-                        size: boxSize,
-                        components: [],
-                        subtotal: 0,
-                        position: info.position,
-                        sourceImage: fileName
-                    });
-                });
-                
-                components.sort((a, b) => a.position - b.position);
-                
-                components.forEach(comp => {
-                    let targetBox = boxes[0];
-                    let minDistance = Infinity;
-                    
-                    for (const box of boxes) {
-                        const distance = comp.position - box.position;
-                        if (distance >= 0 && distance < minDistance) {
-                            minDistance = distance;
-                            targetBox = box;
-                        }
-                    }
-                    addComponentToBox(targetBox, comp);
-                });
-            } else if (components.length > 0) {
-                boxes.push({
-                    name: `配电箱${imageIndex}`,
-                    size: boxSize,
-                    components: [],
-                    subtotal: 0,
-                    position: 0,
-                    sourceImage: fileName
-                });
-                components.forEach(comp => addComponentToBox(boxes[0], comp));
-            }
-            
-            return boxes;
-        }
-        
-        // ========== 开始识别 ==========
-        async function startRecognition() {
-            if (uploadedImages.length === 0) return;
-            
-            processBtn.disabled = true;
-            processBtn.textContent = '🔄 AI识别中...';
-            ocrProgress.classList.add('active');
-            logSection.style.display = 'block';
-            document.getElementById('resultsSection').classList.remove('active');
-            logContent.innerHTML = '';
-            recognitionResults = { boxes: [], grandTotal: 0 };
-            
-            addLog('开始AI识别配电箱系统图...', 'info');
-            addLog(`共上传 ${uploadedImages.length} 张图片`, 'info');
-            
-            try {
-                addLog('正在加载OCR引擎...', 'info');
-                worker = await Tesseract.createWorker('chi_sim+eng', 1, {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            progressFill.style.width = Math.round(m.progress * 100) + '%';
-                            progressText.textContent = `正在识别图片文字... ${Math.round(m.progress * 100)}%`;
-                        }
-                    }
-                });
-                
-                const allParsedBoxes = [];
-                
-                for (let i = 0; i < uploadedImages.length; i++) {
-                    const file = uploadedImages[i];
-                    progressText.textContent = `正在处理第 ${i + 1}/${uploadedImages.length} 张图片...`;
-                    progressFill.style.width = ((i / uploadedImages.length) * 100) + '%';
-                    
-                    addLog(`\n========== 处理图片 ${i + 1}: ${file.name} ==========`, 'info');
-                    
-                    const { data: { text } } = await worker.recognize(file);
-                    addLog(`提取文字长度: ${text.length} 字符`, 'success');
-                    
-                    const imageBoxes = parseBoxesPerImage(text, i + 1, file.name);
-                    
-                    if (imageBoxes.length > 0) {
-                        addLog(`识别到 ${imageBoxes.length} 个配电箱`, 'success');
-                        allParsedBoxes.push(...imageBoxes);
-                    } else {
-                        addLog('未识别到配电箱元器件', 'warning');
-                    }
-                }
-                
-                await worker.terminate();
-                worker = null;
-                
-                if (allParsedBoxes.length > 0) {
-                    addLog(`\n========== 汇总结果 ==========`, 'success');
-                    addLog(`共识别到 ${allParsedBoxes.length} 个配电箱`, 'success');
-                    showResults(allParsedBoxes);
-                } else {
-                    addLog('所有图片均未识别到配电箱信息', 'error');
-                }
-                
-            } catch (error) {
-                console.error('OCR Error:', error);
-                addLog(`识别出错: ${error.message}`, 'error');
-                if (worker) { await worker.terminate(); worker = null; }
-            }
-            
-            ocrProgress.classList.remove('active');
-            processBtn.disabled = false;
-            processBtn.textContent = '🔍 开始AI识别配电箱';
-        }
-        
-        // ========== 显示结果（核心升级：树状格式）==========
-        function showResults(boxes) {
-            const resultsSection = document.getElementById('resultsSection');
-            resultsSection.classList.add('active');
-            
-            // 计算箱体价格和总造价
-            let grandTotal = 0;
-            let totalComponents = 0;
-            
-            boxes.forEach(box => {
-                let boxPrice = 150;
-                if (box.size) {
-                    const sizes = box.size.match(/\d+/g);
-                    if (sizes && sizes.length >= 2) {
-                        boxPrice = Math.max(150, (parseInt(sizes[0]) * parseInt(sizes[1])) / 800);
-                    }
-                }
-                box.boxPrice = parseFloat(boxPrice.toFixed(2));
-                box.totalPrice = parseFloat((box.subtotal + box.boxPrice).toFixed(2));
-                grandTotal += box.totalPrice;
-                totalComponents += box.components.reduce((s, c) => s + c.count, 0);
-            });
-            
-            recognitionResults.boxes = boxes;
-            recognitionResults.grandTotal = grandTotal;
-            
-            // ========== 生成树状视图（按要求格式）==========
-            const treeView = document.getElementById('treeView');
-            let treeHTML = '';
-            
-            boxes.forEach((box, boxIndex) => {
-                treeHTML += `<div class="box-header">【配电箱${boxIndex + 1}：${box.name}】${box.size ? `（${box.size}）` : ''}</div>`;
-                treeHTML += `├── 元器件清单：\n`;
-                
-                box.components.forEach((comp, i) => {
-                    const sources = getPriceSources(comp.model);
-                    const sourceLink = sources[0] ? `<a href="${sources[0].url}" target="_blank">[${sources[0].name}]</a>` : '';
-                    const amount = comp.price * comp.count;
-                    const isLast = i === box.components.length - 1;
-                    const prefix = isLast ? '└── ' : '├── ';
-                    
-                    treeHTML += `│   ${prefix}${comp.name} ${comp.model} ×${comp.count} —— ¥${amount}元 ${sourceLink}\n`;
-                });
-                
-                treeHTML += `├── 箱体费用：¥${box.boxPrice}元\n`;
-                treeHTML += `└── 【配电箱${boxIndex + 1}】合计：¥${(box.totalPrice * 1.15).toFixed(2)}元 (含税)\n`;
-            });
-            
-            treeView.innerHTML = treeHTML;
-            
-            // ========== 生成表格视图 ==========
-            const container = document.getElementById('boxesContainer');
-            container.innerHTML = '';
-            
-            boxes.forEach((box, boxIndex) => {
-                const card = document.createElement('div');
-                card.className = 'box-card';
-                
-                const sources = getPriceSources('default');
-                
-                card.innerHTML = `
-                    <div class="box-card-header">
-                        <div class="title-row">
-                            <h3>📦 ${box.name}</h3>
-                            ${box.size ? `<span style="background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:15px;font-size:0.9rem;">📐 ${box.size}</span>` : ''}
-                        </div>
-                        <div class="box-meta">
-                            <span>🔧 元器件 ${box.components.length} 种</span>
-                            <span>📊 共 ${box.components.reduce((s, c) => s + c.count, 0)} 件</span>
-                            ${box.sourceImage ? `<span>📁 ${box.sourceImage}</span>` : ''}
-                        </div>
-                    </div>
-                    <div class="box-card-body">
-                        ${box.components.length > 0 ? `
-                        <div class="quote-section">
-                            <div class="quote-section-title">💡 元器件清单</div>
-                            <table class="quote-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width:5%">序号</th>
-                                        <th style="width:15%">元器件</th>
-                                        <th style="width:10%">品牌</th>
-                                        <th style="width:28%">型号规格</th>
-                                        <th style="width:6%">单位</th>
-                                        <th style="width:6%">数量</th>
-                                        <th style="width:10%">单价</th>
-                                        <th style="width:10%">合价</th>
-                                        <th style="width:10%">询价来源</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${box.components.map((c, i) => {
-                                        const compSources = getPriceSources(c.model);
-                                        const sourceLinks = compSources.map(s => 
-                                            `<a href="${s.url}" target="_blank" class="source-link">${s.name}</a>`
-                                        ).join('<br>');
-                                        return `
-                                        <tr>
-                                            <td>${i + 1}</td>
-                                            <td><strong>${c.name}</strong></td>
-                                            <td>${c.brand}</td>
-                                            <td><span class="model">${c.model}</span></td>
-                                            <td>${c.unit}</td>
-                                            <td>${c.count}</td>
-                                            <td class="price">¥${c.price}</td>
-                                            <td class="price">¥${(c.price * c.count).toFixed(2)}</td>
-                                            <td style="font-size:11px;text-align:left;">${sourceLinks}</td>
-                                        </tr>
-                                    `}).join('')}
-                                    <tr class="subtotal-row">
-                                        <td colspan="5">💰 元器件小计</td>
-                                        <td>${box.components.reduce((s, c) => s + c.count, 0)}</td>
-                                        <td>-</td>
-                                        <td class="price">¥${box.subtotal.toFixed(2)}</td>
-                                        <td>-</td>
-                                    </tr>
-                                    <tr class="box-row">
-                                        <td colspan="5">📦 配电箱箱体</td>
-                                        <td>1</td>
-                                        <td>¥${box.boxPrice.toFixed(2)}</td>
-                                        <td class="price">¥${box.boxPrice.toFixed(2)}</td>
-                                        <td>-</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        ` : `
-                        <div class="quote-section">
-                            <div class="quote-section-title">⚠️ 未识别到元器件</div>
-                            <p style="text-align:center;color:#999;padding:30px;">请检查图片清晰度或手动输入元器件信息</p>
-                        </div>
-                        `}
-                        <div class="box-total">
-                            <div class="label">💰 ${box.name} 造价合计 <span style="font-size:0.85rem;opacity:0.8;margin-left:10px;">(含税15%)</span></div>
-                            <div class="amount">¥${(box.totalPrice * 1.15).toFixed(2)}</div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-            
-            // 总汇总
-            const grandEl = document.getElementById('grandTotal');
-            grandEl.innerHTML = `
-                <div class="grand-total-item">
-                    <h4>📦 配电箱数量</h4>
-                    <div class="value">${boxes.length} 个</div>
-                </div>
-                <div class="grand-total-item">
-                    <h4>🔧 元器件总数</h4>
-                    <div class="value">${totalComponents} 件</div>
-                </div>
-                <div class="grand-total-item">
-                    <h4>💵 材料费合计</h4>
-                    <div class="value">¥${grandTotal.toFixed(2)}</div>
-                </div>
-                <div class="grand-total-item">
-                    <h4>🧾 含税合计(15%)</h4>
-                    <div class="value">¥${(grandTotal * 1.15).toFixed(2)}</div>
-                </div>
-            `;
-            
-            resultsSection.scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        // ========== 导出Excel ==========
-        function exportToExcel() {
-            if (recognitionResults.boxes.length === 0) {
-                alert('暂无数据可导出');
-                return;
-            }
-            
-            let csv = '\uFEFF';
-            csv += '配电箱报价单,' + new Date().toLocaleDateString() + '\n\n';
-            
-            let index = 1;
-            recognitionResults.boxes.forEach(box => {
-                csv += `"${box.name}"`;
-                if (box.size) csv += `,尺寸:${box.size}`;
-                csv += '\n';
-                csv += '序号,元器件,品牌,型号,单位,数量,单价,合价,询价来源\n';
-                
-                box.components.forEach(comp => {
-                    const sources = getPriceSources(comp.model);
-                    const sourceUrl = sources[0] ? sources[0].url : '';
-                    csv += `${index++},${comp.name},${comp.brand},"${comp.model}",${comp.unit},${comp.count},${comp.price},${(comp.price * comp.count).toFixed(2)},"${sourceUrl}"\n`;
-                });
-                
-                csv += `,,"小计",,,${box.components.reduce((s,c) => s + c.count, 0)},,${box.subtotal.toFixed(2)}\n`;
-                csv += `,,"箱体",,,,,1,${box.boxPrice.toFixed(2)}\n`;
-                csv += `,,"本箱合计",,,,,,${box.totalPrice.toFixed(2)}\n`;
-                csv += `,,"含税(15%)",,,,,,,${(box.totalPrice * 1.15).toFixed(2)}\n\n`;
-            });
-            
-            const totalWithTax = (recognitionResults.grandTotal * 1.15).toFixed(2);
-            csv += `\n总材料费,,,,,,,"${recognitionResults.grandTotal.toFixed(2)}"\n`;
-            csv += `含税总计(15%),,,,,,,,"${totalWithTax}"\n`;
-            
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `配电箱报价单_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`;
-            link.click();
-        }
+        });
     </script>
 </body>
 </html>
