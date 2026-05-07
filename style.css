@@ -199,8 +199,20 @@ a:hover {
 }
 
 #coze-chat-container {
-    min-height: 600px;
+    min-height: 650px;
+    height: 650px;
+    width: 100%;
     background: var(--bg-white);
+    position: relative;
+}
+
+/* Chat SDK iframe 样式适配 */
+#coze-chat-container iframe {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 650px !important;
+    border: none !important;
+    border-radius: 0 0 12px 12px !important;
 }
 
 /* ==========================================
@@ -418,6 +430,11 @@ a:hover {
 
     #coze-chat-container {
         min-height: 500px;
+        height: 500px;
+    }
+
+    #coze-chat-container iframe {
+        min-height: 500px !important;
     }
 
     .feature-grid {

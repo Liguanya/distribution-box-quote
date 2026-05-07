@@ -163,11 +163,11 @@
             chatBot: {
                 el: document.getElementById('coze-chat-container'),
                 title: '配电箱智能识别助手',
+                onShow: function() {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                },
             },
         });
-
-        // SDK 加载完成，隐藏加载提示
-        document.getElementById('loading-overlay').style.display = 'none';
     </script>
 </body>
 </html>
