@@ -294,12 +294,13 @@
             }];
 
             if (uploadedFileId) {
+                // object_string的content必须是JSON字符串，不能直接传数组对象
                 messages = [{
                     role: 'user',
-                    content: [
+                    content: JSON.stringify([
                         { type: 'text', text: content },
                         { type: 'image', file_id: uploadedFileId }
-                    ],
+                    ]),
                     content_type: 'object_string'
                 }];
             }
