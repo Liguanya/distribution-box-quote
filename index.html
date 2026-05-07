@@ -604,7 +604,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // ==================== Markdown 渲染（简化版）====================
+        // ==================== Markdown 渲染（增强版）====================
         function renderMarkdown(text) {
             if (!text) return '';
             
@@ -618,7 +618,15 @@
             // 表格处理
             html = parseMarkdownTable(html);
             
-            // 标题（配电箱分组标题高亮）
+            // 配电箱标题卡片 - 新格式 **【配电箱 XXX】箱体尺寸：XXX**
+            html = html.replace(/\*\*【配电箱\s*([^\]]+)】箱体尺寸：([^\*]+)\*\*/g, 
+                '<div class="box-header-card"><span class="box-icon">⚡</span><span class="box-name">配电箱 $1</span><span class="box-size">箱体尺寸：$2</span></div>');
+            
+            // 总汇总表标题卡片
+            html = html.replace(/\*\*【总汇总表】\*\*/g, 
+                '<div class="summary-header-card"><span class="summary-icon">📊</span><span class="summary-title">总汇总表</span></div>');
+            
+            // 标题
             html = html.replace(/^### (.+)$/gm, '<h3 class="box-title">$1</h3>');
             html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
             html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
@@ -645,6 +653,10 @@
             html = html.replace(/(<\/ul>)<\/p>/g, '$1');
             html = html.replace(/<p>(<pre>)/g, '$1');
             html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<div class="box-header-card")/g, '$1');
+            html = html.replace(/(<\/div>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<div class="summary-header-card")/g, '$1');
+            html = html.replace(/<p>(<div class="table-wrapper")/g, '$1');
 
             return html;
         }
@@ -696,22 +708,162 @@
             return div.innerHTML;
         }
 
-        // ==================== Excel 导出功能（纯JS实现）====================
+        // ==================== Excel 导出功能（纯JS实现 - 增强版）====================
         
-        // 解析Markdown表格数据
+        // 解析Markdown表格数据（支持新格式）
         function parseMarkdownForExport(text) {
             const result = {
                 hasTables: false,
-                boxes: []  // [{name, items: [], summary: {}}]
+                boxes: [],  // [{name, size, items: [], summary: {}}]
+                grandSummary: null  // 总汇总表数据
+            };
+            
+            // 清理文本：处理 Markdown 表格分隔行中的特殊字符
+            text = text.replace(/\|[-:\s|]+\|/g, (match) => {
+                return match.replace(/×/g, 'x').replace(/\*/g, '-');
+            });
+            
+            // 新格式：按 **【配电箱 XXX】** 或 **【总汇总表】** 分割
+            // 首先匹配配电箱标题
+            const boxPattern = /\*\*【配电箱\s*([^\]]+)】箱体尺寸：([^\*]+)\*\*/g;
+            const summaryPattern = /\*\*【总汇总表】\*\*/g;
+            
+            let lastIndex = 0;
+            let match;
+            
+            // 提取所有配电箱段落
+            const sections = [];
+            
+            // 重置正则
+            boxPattern.lastIndex = 0;
+            summaryPattern.lastIndex = 0;
+            
+            // 查找所有配电箱标题位置
+            const positions = [];
+            while ((match = boxPattern.exec(text)) !== null) {
+                positions.push({
+                    type: 'box',
+                    index: match.index,
+                    name: match[1].trim(),
+                    size: match[2].trim(),
+                    endIndex: match.index + match[0].length
+                });
+            }
+            
+            // 查找总汇总表位置
+            while ((match = summaryPattern.exec(text)) !== null) {
+                positions.push({
+                    type: 'summary',
+                    index: match.index,
+                    endIndex: match.index + match[0].length
+                });
+            }
+            
+            // 按位置排序
+            positions.sort((a, b) => a.index - b.index);
+            
+            // 提取各段落内容
+            for (let i = 0; i < positions.length; i++) {
+                const pos = positions[i];
+                const nextPos = positions[i + 1];
+                const sectionText = text.substring(pos.endIndex, nextPos ? nextPos.index : text.length);
+                
+                sections.push({
+                    type: pos.type,
+                    name: pos.name || null,
+                    size: pos.size || null,
+                    content: sectionText.trim()
+                });
+            }
+            
+            // 解析每个配电箱段落
+            sections.forEach(section => {
+                if (section.type === 'summary') {
+                    // 解析总汇总表
+                    result.grandSummary = parseTablesInSection(section.content);
+                    if (result.grandSummary.length > 0) {
+                        result.hasTables = true;
+                    }
+                } else if (section.type === 'box' && section.name) {
+                    // 解析配电箱内容
+                    const parsed = parseTablesInSection(section.content);
+                    
+                    let items = [];
+                    let summary = [];
+                    
+                    // 分类表格：元器件清单 vs 报价汇总
+                    parsed.forEach(table => {
+                        const headers = table[0] || [];
+                        const hasSequenceCol = headers.some(h => /^(序号|#|no\.)/i.test(h));
+                        const hasItemCol = headers.some(h => /^(元器件|物料|名称|设备)/i.test(h));
+                        const hasSummaryCol = headers.some(h => /^(项目|不含税|含税|税金|人工|箱体|元器件小计)/i.test(h));
+                        const hasBoxIdCol = headers.some(h => /^(配电箱|编号)/i.test(h));
+                        
+                        if (hasSequenceCol || hasItemCol) {
+                            items = table.slice(1); // 去掉表头
+                        } else if (hasSummaryCol && !hasBoxIdCol) {
+                            summary = table.slice(1);
+                        } else if (hasBoxIdCol) {
+                            // 这是汇总表
+                            result.grandSummary = table;
+                            result.hasTables = true;
+                        }
+                    });
+                    
+                    if (items.length > 0 || summary.length > 0) {
+                        result.boxes.push({
+                            name: section.name,
+                            size: section.size,
+                            items: items,
+                            summary: summary
+                        });
+                        result.hasTables = true;
+                    }
+                }
+            });
+            
+            // 如果没有识别到配电箱，尝试旧格式作为后备
+            if (result.boxes.length === 0) {
+                return parseMarkdownForExportLegacy(text);
+            }
+            
+            return result;
+        }
+        
+        // 解析段落中的所有表格
+        function parseTablesInSection(sectionText) {
+            const tables = [];
+            const tableRegex = /^\|(.+)\|\s*\n\|[-:\s|]+\|\s*\n((?:\|.+\|\s*\n?)+)/gm;
+            let match;
+            
+            while ((match = tableRegex.exec(sectionText)) !== null) {
+                const headerLine = match[1];
+                const bodyLines = match[2];
+                
+                const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+                const rows = bodyLines.trim().split('\n').map(row => {
+                    return row.split('|').map(cell => cell.trim()).filter(cell => cell);
+                });
+                
+                tables.push([headers, ...rows]);
+            }
+            
+            return tables;
+        }
+        
+        // 旧格式解析（后备方案）
+        function parseMarkdownForExportLegacy(text) {
+            const result = {
+                hasTables: false,
+                boxes: [],
+                grandSummary: null
             };
             
             // 按配电箱标题分割内容
-            const boxPattern = /(?:^|\n)(###\s*[一二三四五六七八九十\d+\.]*[\s]*(?:配电箱?|Box|箱)[_\-]?\s*([A-Za-z0-9\u4e00-\u9fa5]+)|(?:^|\n)([A-Za-z0-9\u4e00-\u9fa5]{2,10})(?:AP|DB|BOX|配电箱)?[_\-\s]*?(?:元器件清单|物料清单|报价))/gm;
-            
-            // 简单方案：按 "###" 标题分割
             const sections = text.split(/(?=###\s)/);
             
             let currentBox = null;
+            let currentSize = null;
             let currentItems = [];
             let summaryData = [];
             
@@ -726,6 +878,7 @@
                     if (currentBox && currentItems.length > 0) {
                         result.boxes.push({
                             name: currentBox,
+                            size: currentSize,
                             items: currentItems,
                             summary: summaryData
                         });
@@ -733,7 +886,6 @@
                     
                     // 提取配电箱名称
                     let boxName = titleMatch[1].trim();
-                    // 尝试提取配电箱编号
                     const nameMatch = boxName.match(/(?:配电箱?|Box|箱)[_\-]?\s*([A-Za-z0-9\u4e00-\u9fa5]+)/i) 
                                    || boxName.match(/^([A-Za-z0-9\u4e00-\u9fa5]{2,10})/)
                                    || boxName.match(/([A-Za-z0-9\u4e00-\u9fa5]{2,10})/);
@@ -765,9 +917,8 @@
                     if (isItemTable && currentBox) {
                         currentItems = currentItems.concat(rows);
                     } else if (isSummaryTable) {
-                        summaryData = summaryData.concat(rows);
+                        result.grandSummary = [headers, ...rows];
                     } else if (currentBox) {
-                        // 默认当作元器件表
                         currentItems = currentItems.concat(rows);
                     }
                 }
@@ -777,6 +928,7 @@
             if (currentBox && currentItems.length > 0) {
                 result.boxes.push({
                     name: currentBox,
+                    size: currentSize,
                     items: currentItems,
                     summary: summaryData
                 });
@@ -785,12 +937,15 @@
             return result;
         }
 
-        // 生成Excel文件（SpreadsheetML XML格式，纯JS）
-        function generateExcel(boxes) {
+        // 生成Excel文件（增强版 - 每个配电箱一个Sheet）
+        function generateExcel(parsedData) {
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
             const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
             const fileName = `配电箱报价_${dateStr}_${timeStr}.xls`;
+            
+            const boxes = parsedData.boxes || [];
+            const grandSummary = parsedData.grandSummary;
             
             // XML编码函数
             const xmlEncode = (str) => {
@@ -804,14 +959,19 @@
             };
             
             // 生成工作表
-            const generateSheet = (sheetName, headers, rows) => {
+            const generateSheet = (sheetName, headers, rows, startRow) => {
                 let sheet = `<Worksheet ss:Name="${xmlEncode(sheetName)}">
 <Table>`;
+                
+                // 如果有起始行标题
+                if (startRow) {
+                    sheet += `<Row><Cell ss:MergeAcross="${headers.length - 1}" ss:StyleID="TitleStyle"><Data ss:Type="String">${xmlEncode(startRow)}</Data></Cell></Row>`;
+                }
                 
                 // 表头行
                 sheet += '<Row>';
                 headers.forEach(h => {
-                    sheet += `<Cell><Data ss:Type="String">${xmlEncode(h)}</Data></Cell>`;
+                    sheet += `<Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${xmlEncode(h)}</Data></Cell>`;
                 });
                 sheet += '</Row>';
                 
@@ -820,8 +980,8 @@
                     sheet += '<Row>';
                     row.forEach(cell => {
                         // 判断数据类型
-                        const numValue = parseFloat(cell);
-                        if (!isNaN(numValue) && cell.trim() !== '') {
+                        const numValue = parseFloat(String(cell).replace(/[^\d.-]/g, ''));
+                        if (!isNaN(numValue) && String(cell).trim() !== '' && /^\s*[\d,.]+/.test(String(cell))) {
                             sheet += `<Cell><Data ss:Type="Number">${numValue}</Data></Cell>`;
                         } else {
                             sheet += `<Cell><Data ss:Type="String">${xmlEncode(cell)}</Data></Cell>`;
@@ -849,55 +1009,124 @@
         <Interior ss:Color="#1A365D" ss:Pattern="Solid"/>
     </Style>
     <Style ss:ID="TitleStyle">
-        <Font ss:Bold="1" ss:Color="#1A365D"/>
+        <Font ss:Bold="1" ss:Size="14" ss:Color="#1A365D"/>
         <Interior ss:Color="#F7FAFC" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="TotalStyle">
+        <Font ss:Bold="1"/>
+        <Interior ss:Color="#FFF5E6" ss:Pattern="Solid"/>
     </Style>
 </Styles>`;
             
-            // 生成每个配电箱的工作表
-            let allSummaryRows = [];
+            // 为每个配电箱生成Sheet
             boxes.forEach(box => {
+                const sheetName = box.name.length > 31 ? box.name.substring(0, 28) + '...' : box.name;
+                
+                // 元器件清单
                 if (box.items.length > 0) {
-                    // 提取元器件表头（假设第一行是表头）
                     const itemHeaders = ['序号', '元器件名称', '型号规格', '数量', '单价(元)', '小计(元)'];
-                    workbook += generateSheet(box.name, itemHeaders, box.items);
+                    // 使用实际的表头
+                    if (box.items[0] && box.items[0].length > 0) {
+                        // 检查是否已经有表头（第一行是否包含"序号"等）
+                        const firstRow = box.items[0];
+                        const hasHeader = firstRow.some(cell => /^(序号|#|名称|型号)/.test(cell));
+                        if (hasHeader) {
+                            workbook += generateSheet(sheetName, firstRow, box.items.slice(1), 
+                                `配电箱 ${box.name} - 元器件清单`);
+                        } else {
+                            workbook += generateSheet(sheetName, itemHeaders, box.items, 
+                                `配电箱 ${box.name} - 元器件清单`);
+                        }
+                    } else {
+                        workbook += generateSheet(sheetName, itemHeaders, box.items, 
+                            `配电箱 ${box.name} - 元器件清单`);
+                    }
                 }
                 
-                // 收集汇总数据
+                // 报价汇总（在同一Sheet的下方）
                 if (box.summary.length > 0) {
-                    box.summary.forEach(row => {
-                        allSummaryRows.push(row);
-                    });
-                } else {
-                    // 如果没有汇总表，根据元器件表计算
-                    let total = 0;
-                    box.items.forEach(row => {
-                        // 尝试从最后一列获取小计
-                        const lastCol = row[row.length - 1];
-                        const num = parseFloat(lastCol);
-                        if (!isNaN(num)) {
-                            total += num;
-                        }
-                    });
-                    if (total > 0) {
-                        const management = total * 0.15;
-                        allSummaryRows.push([box.name, total.toFixed(2), management.toFixed(2), (total + management).toFixed(2)]);
+                    const summaryHeaders = ['项目', '金额(元)'];
+                    // 使用实际表头
+                    if (box.summary[0] && box.summary[0].length >= 2) {
+                        workbook += generateSheet(sheetName + '_汇总', box.summary[0], box.summary.slice(1),
+                            `配电箱 ${box.name} - 报价汇总`);
+                    } else {
+                        workbook += generateSheet(sheetName + '_汇总', summaryHeaders, box.summary,
+                            `配电箱 ${box.name} - 报价汇总`);
                     }
                 }
             });
             
-            // 生成汇总工作表
-            if (allSummaryRows.length > 0) {
-                const summaryHeaders = ['配电箱编号', '元器件费用(元)', '人工管理费(15%)(元)', '合计(元)'];
-                workbook += generateSheet('报价汇总', summaryHeaders, allSummaryRows);
+            // 生成总汇总Sheet
+            if (grandSummary && grandSummary.length > 1) {
+                const summaryHeaders = grandSummary[0];
+                workbook += generateSheet('报价汇总', summaryHeaders, grandSummary.slice(1));
+            } else if (boxes.length > 0) {
+                // 如果没有总汇总表，从各配电箱汇总数据生成
+                let allSummaryRows = [];
+                let grandTotal = { items: 0, box: 0, labor: 0, noTax: 0, tax: 0, withTax: 0 };
                 
-                // 添加总计行
-                let totalSum = 0;
-                allSummaryRows.forEach(row => {
-                    const totalCol = row[row.length - 1];
-                    const num = parseFloat(totalCol);
-                    if (!isNaN(num)) totalSum += num;
+                boxes.forEach(box => {
+                    if (box.summary.length > 0) {
+                        allSummaryRows.push(...box.summary);
+                    }
+                    
+                    // 计算总计
+                    let itemsTotal = 0;
+                    let boxFee = 0;
+                    let laborFee = 0;
+                    let noTaxTotal = 0;
+                    let taxTotal = 0;
+                    let withTaxTotal = 0;
+                    
+                    // 从汇总表提取数据
+                    if (box.summary.length > 0) {
+                        box.summary.forEach(row => {
+                            const label = String(row[0] || '').trim();
+                            const value = parseFloat(String(row[1] || '0').replace(/[^\d.]/g, '')) || 0;
+                            
+                            if (/小计|元器件|元件/.test(label)) {
+                                itemsTotal = value;
+                                grandTotal.items += value;
+                            } else if (/箱体/.test(label)) {
+                                boxFee = value;
+                                grandTotal.box += value;
+                            } else if (/人工|辅材/.test(label)) {
+                                laborFee = value;
+                                grandTotal.labor += value;
+                            } else if (/不含税/.test(label)) {
+                                noTaxTotal = value;
+                                grandTotal.noTax += value;
+                            } else if (/税金/.test(label)) {
+                                taxTotal = value;
+                                grandTotal.tax += value;
+                            } else if (/含税/.test(label)) {
+                                withTaxTotal = value;
+                                grandTotal.withTax += value;
+                            }
+                        });
+                    }
                 });
+                
+                if (allSummaryRows.length > 0) {
+                    workbook += generateSheet('报价汇总', ['配电箱编号', '元器件费用', '箱体费用', '人工辅材费', '不含税合计', '含税总价'], allSummaryRows);
+                } else {
+                    // 生成汇总数据
+                    const summaryData = boxes.map(box => [
+                        box.name,
+                        '', // 元器件费用
+                        '', // 箱体费用
+                        '', // 人工辅材费
+                        '', // 不含税合计
+                        ''  // 含税总价
+                    ]);
+                    summaryData.push(['合计', grandTotal.items.toFixed(2), grandTotal.box.toFixed(2), 
+                        grandTotal.labor.toFixed(2), grandTotal.noTax.toFixed(2), grandTotal.withTax.toFixed(2)]);
+                    
+                    workbook += generateSheet('报价汇总', 
+                        ['配电箱编号', '元器件费用(元)', '箱体费用(元)', '人工辅材费(元)', '不含税合计(元)', '含税总价(元)'],
+                        summaryData);
+                }
             }
             
             workbook += '</Workbook>';
@@ -931,11 +1160,11 @@
                 }
                 
                 if (parsedData.boxes.length === 0) {
-                    alert('未识别到配电箱信息，请确保AI回复包含配电箱标题（如 ### 一、配电箱2AP1）');
+                    alert('未识别到配电箱信息，请确保AI回复包含配电箱标题（如 **【配电箱 2AP1】**）');
                     return;
                 }
                 
-                generateExcel(parsedData.boxes);
+                generateExcel(parsedData);
             } catch (error) {
                 console.error('导出失败:', error);
                 alert('导出失败: ' + error.message);
