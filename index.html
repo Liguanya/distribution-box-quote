@@ -789,32 +789,40 @@
                     const parsed = parseTablesInSection(section.content);
                     
                     let items = [];
+                    let fullQuote = [];
                     let summary = [];
                     
-                    // 分类表格：元器件清单 vs 报价汇总
+                    // 分类表格：元器件清单 vs 完整报价表 vs 报价汇总 vs 总汇总
                     parsed.forEach(table => {
                         const headers = table[0] || [];
                         const hasSequenceCol = headers.some(h => /^(序号|#|no\.)/i.test(h));
                         const hasItemCol = headers.some(h => /^(元器件|物料|名称|设备)/i.test(h));
-                        const hasSummaryCol = headers.some(h => /^(项目|不含税|含税|税金|人工|箱体|元器件小计)/i.test(h));
+                        const hasProjectCol = headers.some(h => /^(费用项目|项目)/i.test(h));
+                        const hasSpecCol = headers.some(h => /^(规格说明)/i.test(h));
                         const hasBoxIdCol = headers.some(h => /^(配电箱|编号)/i.test(h));
                         
-                        if (hasSequenceCol || hasItemCol) {
-                            items = table.slice(1); // 去掉表头
-                        } else if (hasSummaryCol && !hasBoxIdCol) {
-                            summary = table.slice(1);
-                        } else if (hasBoxIdCol) {
-                            // 这是汇总表
+                        if (hasBoxIdCol) {
+                            // 总汇总表
                             result.grandSummary = table;
                             result.hasTables = true;
+                        } else if (hasSequenceCol && hasItemCol && !hasProjectCol) {
+                            // 元器件清单表（有序号+元器件名称，但无费用项目列）
+                            items = table;
+                        } else if (hasProjectCol || hasSpecCol || (hasSequenceCol && hasProjectCol)) {
+                            // 完整报价表（有费用项目列或规格说明列）
+                            fullQuote = table;
+                        } else if (hasSequenceCol) {
+                            // 有序号但无法明确分类，可能是元器件清单
+                            items = table;
                         }
                     });
                     
-                    if (items.length > 0 || summary.length > 0) {
+                    if (items.length > 0 || fullQuote.length > 0 || summary.length > 0) {
                         result.boxes.push({
                             name: section.name,
                             size: section.size,
                             items: items,
+                            fullQuote: fullQuote,
                             summary: summary
                         });
                         result.hasTables = true;
@@ -1022,12 +1030,17 @@
             boxes.forEach(box => {
                 const sheetName = box.name.length > 31 ? box.name.substring(0, 28) + '...' : box.name;
                 
-                // 元器件清单
-                if (box.items.length > 0) {
+                // 优先使用完整报价表（含箱体、铜排、人工等），如果没有则用元器件清单
+                if (box.fullQuote && box.fullQuote.length > 1) {
+                    // 完整报价表（含所有费用项目）
+                    const fqHeaders = box.fullQuote[0];
+                    const fqRows = box.fullQuote.slice(1);
+                    workbook += generateSheet(sheetName, fqHeaders, fqRows, 
+                        `配电箱 ${box.name} 完整报价 - 箱体尺寸：${box.size || '未知'}`);
+                } else if (box.items && box.items.length > 0) {
+                    // 只有元器件清单的情况
                     const itemHeaders = ['序号', '元器件名称', '型号规格', '数量', '单价(元)', '小计(元)'];
-                    // 使用实际的表头
                     if (box.items[0] && box.items[0].length > 0) {
-                        // 检查是否已经有表头（第一行是否包含"序号"等）
                         const firstRow = box.items[0];
                         const hasHeader = firstRow.some(cell => /^(序号|#|名称|型号)/.test(cell));
                         if (hasHeader) {
@@ -1043,10 +1056,9 @@
                     }
                 }
                 
-                // 报价汇总（在同一Sheet的下方）
-                if (box.summary.length > 0) {
+                // 报价汇总（如果有且与完整报价不同）
+                if (box.summary && box.summary.length > 0) {
                     const summaryHeaders = ['项目', '金额(元)'];
-                    // 使用实际表头
                     if (box.summary[0] && box.summary[0].length >= 2) {
                         workbook += generateSheet(sheetName + '_汇总', box.summary[0], box.summary.slice(1),
                             `配电箱 ${box.name} - 报价汇总`);
