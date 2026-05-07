@@ -273,7 +273,7 @@
                 await callCozeChat(content, assistantMsg);
             } catch (error) {
                 console.error('发送错误:', error);
-                assistantMsg.content.innerHTML = '<p style="color: #e53e3e;">发送消息失败，请重试</p>';
+                assistantMsg.content.innerHTML = `<p style="color: #e53e3e;">❌ 请求失败: ${escapeHtml(error.message)}</p><p style="color: #999; font-size: 12px;">请检查网络连接后重试，或联系管理员</p>`;
             }
 
             // 清理图片预览
@@ -285,6 +285,7 @@
         }
 
         // ==================== Coze API 调用 ====================
+        // 优先使用非流式模式（公司网络可能拦截SSE流），失败后尝试流式
         async function callCozeChat(content, assistantMsg) {
             let messages = [{
                 role: 'user',
@@ -303,6 +304,102 @@
                 }];
             }
 
+            // 显示思考中状态
+            updateMessageContent(assistantMsg, '⏳ 正在思考中...');
+
+            try {
+                // 优先非流式（兼容性最好）
+                await callCozeChatNonStream(messages, assistantMsg);
+            } catch (nonStreamErr) {
+                console.warn('非流式调用失败，尝试流式:', nonStreamErr);
+                try {
+                    // 非流式失败，尝试流式
+                    await callCozeChatStream(messages, assistantMsg);
+                } catch (streamErr) {
+                    console.error('流式调用也失败:', streamErr);
+                    throw new Error(`请求失败: ${nonStreamErr.message}`);
+                }
+            }
+        }
+
+        // 非流式模式：POST创建对话 → 轮询状态 → 获取结果
+        async function callCozeChatNonStream(messages, assistantMsg) {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bot_id: CONFIG.BOT_ID,
+                    user_id: CONFIG.USER_ID,
+                    stream: false,
+                    auto_save_history: true,
+                    additional_messages: messages
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                throw new Error(`API返回${response.status}: ${errText.slice(0, 200)}`);
+            }
+
+            const createData = await response.json();
+            if (createData.code !== 0) {
+                throw new Error(`创建对话失败(${createData.code}): ${createData.msg}`);
+            }
+
+            const chatId = createData.data.id;
+            const conversationId = createData.data.conversation_id;
+
+            // 轮询等待完成，最多120秒
+            for (let i = 0; i < 60; i++) {
+                await new Promise(r => setTimeout(r, 2000));
+                
+                // 更新等待提示
+                if (i % 5 === 0 && i > 0) {
+                    updateMessageContent(assistantMsg, `⏳ 正在思考中...(${i * 2}秒)`);
+                }
+
+                const pollResp = await fetch(
+                    `${CONFIG.API_BASE_URL}/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${conversationId}`,
+                    { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
+                );
+                
+                if (!pollResp.ok) {
+                    throw new Error(`轮询失败: ${pollResp.status}`);
+                }
+                
+                const pollData = await pollResp.json();
+                
+                if (pollData.data && pollData.data.status === 'completed') {
+                    // 获取消息列表
+                    const msgResp = await fetch(
+                        `${CONFIG.API_BASE_URL}/v3/chat/message/list?chat_id=${chatId}&conversation_id=${conversationId}`,
+                        { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
+                    );
+                    const msgData = await msgResp.json();
+                    
+                    if (msgData.data) {
+                        const answer = msgData.data.find(m => m.type === 'answer' && m.role === 'assistant');
+                        if (answer && answer.content) {
+                            updateMessageContent(assistantMsg, answer.content);
+                            return;
+                        }
+                    }
+                    throw new Error('对话完成但未获取到回复内容');
+                }
+                
+                if (pollData.data && pollData.data.status === 'failed') {
+                    const errMsg = pollData.data.last_error ? pollData.data.last_error.msg : '未知错误';
+                    throw new Error(`对话处理失败: ${errMsg}`);
+                }
+            }
+            throw new Error('对话超时(120秒)');
+        }
+
+        // 流式SSE模式（备选方案）
+        async function callCozeChatStream(messages, assistantMsg) {
             const response = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
                 method: 'POST',
                 headers: {
@@ -319,10 +416,10 @@
             });
 
             if (!response.ok) {
-                throw new Error(`API请求失败: ${response.status}`);
+                const errText = await response.text().catch(() => '');
+                throw new Error(`流式API返回${response.status}: ${errText.slice(0, 200)}`);
             }
 
-            // 流式SSE直接在响应体中
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -349,7 +446,6 @@
                         try {
                             const data = JSON.parse(dataStr);
                             
-                            // 处理增量文本（content是增量片段，需要追加）
                             if (currentEvent === 'conversation.message.delta') {
                                 if (data.type === 'answer' && data.content) {
                                     fullContent += data.content;
@@ -357,82 +453,19 @@
                                 }
                             }
                             
-                            // 处理消息完成（content是完整文本，直接替换）
                             if (currentEvent === 'conversation.message.completed') {
                                 if (data.type === 'answer' && data.content) {
                                     fullContent = data.content;
                                     updateMessageContent(assistantMsg, fullContent);
                                 }
                             }
-                        } catch (e) {
-                            // 忽略解析错误
-                        }
+                        } catch (e) {}
                     }
                 }
             }
 
-            // 如果流式没有收到内容，用非流式兜底
             if (!fullContent) {
-                await callCozeChatNonStream(content, messages, assistantMsg);
-            }
-        }
-
-        // 非流式兜底方案
-        async function callCozeChatNonStream(content, messages, assistantMsg) {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    bot_id: CONFIG.BOT_ID,
-                    user_id: CONFIG.USER_ID,
-                    stream: false,
-                    auto_save_history: true,
-                    additional_messages: messages
-                })
-            });
-
-            const createData = await response.json();
-            if (createData.code !== 0) {
-                throw new Error(createData.msg || '创建对话失败');
-            }
-
-            const chatId = createData.data.id;
-            const conversationId = createData.data.conversation_id;
-
-            // 轮询等待完成
-            for (let i = 0; i < 60; i++) {
-                await new Promise(r => setTimeout(r, 2000));
-                
-                const pollResp = await fetch(
-                    `${CONFIG.API_BASE_URL}/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${conversationId}`,
-                    { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
-                );
-                const pollData = await pollResp.json();
-                
-                if (pollData.data && pollData.data.status === 'completed') {
-                    // 获取消息列表
-                    const msgResp = await fetch(
-                        `${CONFIG.API_BASE_URL}/v3/chat/message/list?chat_id=${chatId}&conversation_id=${conversationId}`,
-                        { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
-                    );
-                    const msgData = await msgResp.json();
-                    
-                    if (msgData.data) {
-                        const answer = msgData.data.find(m => m.type === 'answer' && m.role === 'assistant');
-                        if (answer && answer.content) {
-                            updateMessageContent(assistantMsg, answer.content);
-                            return;
-                        }
-                    }
-                    break;
-                }
-                
-                if (pollData.data && pollData.data.status === 'failed') {
-                    throw new Error('对话处理失败');
-                }
+                throw new Error('流式响应无内容');
             }
         }
 
