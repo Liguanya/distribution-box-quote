@@ -54,18 +54,19 @@
                         </div>
                     </div>
                     
-                    <!-- 图片预览区 -->
+                    <!-- 图片预览区（支持多图） -->
                     <div class="image-preview-area" id="image-preview-area" style="display: none;">
-                        <div class="image-preview-item">
-                            <img id="preview-image" src="" alt="预览图片">
-                            <button class="remove-image-btn" id="remove-image-btn" title="移除图片">×</button>
+                        <div class="preview-header">
+                            <span class="preview-count" id="preview-count"></span>
+                            <button class="clear-all-btn" id="clear-all-btn">清空全部</button>
                         </div>
+                        <div class="image-preview-grid" id="image-preview-grid"></div>
                     </div>
                     
                     <!-- 输入区域 -->
                     <div class="chat-input-area">
-                        <button class="upload-btn" id="upload-btn" title="上传配电箱图片">📎</button>
-                        <input type="file" id="file-input" accept="image/*" hidden>
+                        <button class="upload-btn" id="upload-btn" title="上传配电箱图片（支持多图）">📎</button>
+                        <input type="file" id="file-input" accept="image/*" multiple hidden>
                         <input type="text" id="msg-input" placeholder="输入消息或上传配电箱系统图...">
                         <button class="send-btn" id="send-btn">发送</button>
                     </div>
@@ -79,8 +80,8 @@
             <div class="feature-grid">
                 <div class="feature-card">
                     <div class="feature-icon">📤</div>
-                    <h4>图片上传</h4>
-                    <p>支持上传配电箱系统图、电气原理图，自动识别元器件</p>
+                    <h4>多图上传</h4>
+                    <p>支持一次上传多张配电箱系统图，同时识别多个配电箱</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🔍</div>
@@ -89,13 +90,13 @@
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">📋</div>
-                    <h4>标准报价</h4>
-                    <p>根据识别结果自动匹配市场价，生成完整元器件报价清单</p>
+                    <h4>分组报价</h4>
+                    <p>按配电箱分组展示元器件清单和报价，清晰明了</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-icon">✏️</div>
-                    <h4>在线修正</h4>
-                    <p>支持对识别结果进行人工修正和补充调整</p>
+                    <div class="feature-icon">📥</div>
+                    <h4>Excel导出</h4>
+                    <p>一键导出Excel报价表，每个配电箱单独一个Sheet</p>
                 </div>
             </div>
         </div>
@@ -108,7 +109,7 @@
                     <div class="step-number">1</div>
                     <div class="step-content">
                         <h4>上传配电箱图片</h4>
-                        <p>点击对话窗口左侧的图片上传按钮，选择配电箱系统图或电气原理图</p>
+                        <p>点击对话窗口左侧的图片上传按钮，支持一次选择多张配电箱系统图</p>
                     </div>
                 </div>
                 <div class="step">
@@ -121,15 +122,15 @@
                 <div class="step">
                     <div class="step-number">3</div>
                     <div class="step-content">
-                        <h4>生成报价表</h4>
-                        <p>根据识别结果自动匹配市场价，生成完整的元器件报价清单</p>
+                        <h4>分组报价</h4>
+                        <p>AI按配电箱分组展示元器件清单和报价，每个配电箱单独列出</p>
                     </div>
                 </div>
                 <div class="step">
                     <div class="step-number">4</div>
                     <div class="step-content">
-                        <h4>核对与导出</h4>
-                        <p>核对报价内容，如有问题可在线修正，确认无误后导出使用</p>
+                        <h4>导出使用</h4>
+                        <p>点击"📥 导出Excel"按钮，一键导出完整报价表</p>
                     </div>
                 </div>
             </div>
@@ -167,11 +168,12 @@
         const uploadBtn = document.getElementById('upload-btn');
         const fileInput = document.getElementById('file-input');
         const imagePreviewArea = document.getElementById('image-preview-area');
-        const previewImage = document.getElementById('preview-image');
-        const removeImageBtn = document.getElementById('remove-image-btn');
+        const imagePreviewGrid = document.getElementById('image-preview-grid');
+        const previewCount = document.getElementById('preview-count');
+        const clearAllBtn = document.getElementById('clear-all-btn');
 
-        // 状态
-        let uploadedFileId = null;
+        // 状态 - 改为支持多图
+        let uploadedImages = [];  // [{fileId, dataUrl, fileName}, ...]
         let isProcessing = false;
 
         // ==================== 事件绑定 ====================
@@ -184,38 +186,76 @@
         });
         uploadBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', handleFileSelect);
-        removeImageBtn.addEventListener('click', clearImagePreview);
+        clearAllBtn.addEventListener('click', clearAllImages);
 
-        // ==================== 文件处理 ====================
+        // ==================== 文件处理（支持多图）====================
         function handleFileSelect(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
             
-            if (!file.type.startsWith('image/')) {
+            // 过滤非图片
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            if (!imageFiles.length) {
                 alert('请上传图片文件');
                 return;
             }
 
-            // 预览图片
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                previewImage.src = event.target.result;
-                imagePreviewArea.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+            // 处理每个图片
+            imageFiles.forEach(file => {
+                // 预览图片
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const imageData = {
+                        dataUrl: event.target.result,
+                        fileName: file.name,
+                        fileId: null  // 上传后填充
+                    };
+                    uploadedImages.push(imageData);
+                    updateImagePreview();
+                    
+                    // 上传到Coze
+                    uploadFileToCoze(file, uploadedImages.length - 1);
+                };
+                reader.readAsDataURL(file);
+            });
 
-            // 上传文件到Coze
-            uploadFileToCoze(file);
-        }
-
-        function clearImagePreview() {
-            previewImage.src = '';
-            imagePreviewArea.style.display = 'none';
+            // 清空file input以便再次选择相同文件
             fileInput.value = '';
-            uploadedFileId = null;
         }
 
-        async function uploadFileToCoze(file) {
+        function updateImagePreview() {
+            if (uploadedImages.length === 0) {
+                imagePreviewArea.style.display = 'none';
+                return;
+            }
+
+            imagePreviewArea.style.display = 'block';
+            previewCount.textContent = `已上传 ${uploadedImages.length} 张图片`;
+
+            // 渲染缩略图网格
+            imagePreviewGrid.innerHTML = uploadedImages.map((img, index) => `
+                <div class="image-preview-item" data-index="${index}">
+                    <img src="${img.dataUrl}" alt="${img.fileName}">
+                    <button class="remove-image-btn" onclick="removeImage(${index})" title="移除">×</button>
+                    ${!img.fileId ? '<span class="uploading-overlay">上传中...</span>' : ''}
+                </div>
+            `).join('');
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            updateImagePreview();
+        }
+
+        function clearAllImages() {
+            uploadedImages = [];
+            updateImagePreview();
+        }
+
+        // 暴露到全局供 onclick 调用
+        window.removeImage = removeImage;
+
+        async function uploadFileToCoze(file, imageIndex) {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -230,17 +270,16 @@
 
                 const data = await response.json();
                 if (data.code === 0 && data.data) {
-                    uploadedFileId = data.data.id;
-                    console.log('文件上传成功:', uploadedFileId);
+                    uploadedImages[imageIndex].fileId = data.data.id;
+                    console.log('文件上传成功:', data.data.id);
+                    updateImagePreview();  // 更新上传状态
                 } else {
                     console.error('文件上传失败:', data);
-                    alert('图片上传失败，请重试');
-                    clearImagePreview();
+                    alert(`图片 ${uploadedImages[imageIndex].fileName} 上传失败，请重试`);
                 }
             } catch (error) {
                 console.error('上传错误:', error);
-                alert('图片上传失败，请重试');
-                clearImagePreview();
+                alert(`图片上传失败，请重试`);
             }
         }
 
@@ -248,8 +287,17 @@
         async function handleSend() {
             const message = msgInput.value.trim();
             
-            if (!message && !uploadedFileId) {
+            // 检查是否有图片已上传完成（fileId 不为 null）
+            const uploadedFileIds = uploadedImages.filter(img => img.fileId).map(img => img.fileId);
+            const allImagesUploaded = uploadedImages.every(img => img.fileId);
+            
+            if (!message && uploadedFileIds.length === 0) {
                 alert('请输入消息或上传图片');
+                return;
+            }
+
+            if (!allImagesUploaded && uploadedImages.length > 0) {
+                alert('仍有图片正在上传中，请等待上传完成后再发送');
                 return;
             }
 
@@ -258,8 +306,9 @@
             sendBtn.disabled = true;
             sendBtn.textContent = '处理中...';
 
-            // 添加用户消息
-            addUserMessage(message, previewImage.src || null);
+            // 添加用户消息（显示所有图片）
+            const imageDataUrls = uploadedImages.map(img => img.dataUrl);
+            addUserMessage(message, imageDataUrls);
             msgInput.value = '';
 
             // 创建助手消息占位
@@ -270,14 +319,14 @@
                 let content = message || '识别图中配电箱及元器件并组价';
                 
                 // 调用Coze API
-                await callCozeChat(content, assistantMsg);
+                await callCozeChat(content, uploadedFileIds, assistantMsg);
             } catch (error) {
                 console.error('发送错误:', error);
                 assistantMsg.content.innerHTML = `<p style="color: #e53e3e;">❌ 请求失败: ${escapeHtml(error.message)}</p><p style="color: #999; font-size: 12px;">请检查网络连接后重试，或联系管理员</p>`;
             }
 
             // 清理图片预览
-            clearImagePreview();
+            clearAllImages();
             
             isProcessing = false;
             sendBtn.disabled = false;
@@ -286,21 +335,23 @@
 
         // ==================== Coze API 调用 ====================
         // 优先使用非流式模式（公司网络可能拦截SSE流），失败后尝试流式
-        async function callCozeChat(content, assistantMsg) {
+        async function callCozeChat(content, fileIds, assistantMsg) {
             let messages = [{
                 role: 'user',
                 content: content,
                 content_type: 'text'
             }];
 
-            if (uploadedFileId) {
-                // object_string的content必须是JSON字符串，不能直接传数组对象
+            if (fileIds && fileIds.length > 0) {
+                // 构建多图消息
+                const contentArray = [{ type: 'text', text: content }];
+                fileIds.forEach(fileId => {
+                    contentArray.push({ type: 'image', file_id: fileId });
+                });
+                
                 messages = [{
                     role: 'user',
-                    content: JSON.stringify([
-                        { type: 'text', text: content },
-                        { type: 'image', file_id: uploadedFileId }
-                    ]),
+                    content: JSON.stringify(contentArray),
                     content_type: 'object_string'
                 }];
             }
@@ -384,7 +435,7 @@
                     if (msgData.data) {
                         const answer = msgData.data.find(m => m.type === 'answer' && m.role === 'assistant');
                         if (answer && answer.content) {
-                            updateMessageContent(assistantMsg, answer.content);
+                            updateMessageContentWithExport(assistantMsg, answer.content);
                             return;
                         }
                     }
@@ -450,14 +501,14 @@
                             if (currentEvent === 'conversation.message.delta') {
                                 if (data.type === 'answer' && data.content) {
                                     fullContent += data.content;
-                                    updateMessageContent(assistantMsg, fullContent);
+                                    updateMessageContentWithExport(assistantMsg, fullContent);
                                 }
                             }
                             
                             if (currentEvent === 'conversation.message.completed') {
                                 if (data.type === 'answer' && data.content) {
                                     fullContent = data.content;
-                                    updateMessageContent(assistantMsg, fullContent);
+                                    updateMessageContentWithExport(assistantMsg, fullContent);
                                 }
                             }
                         } catch (e) {}
@@ -470,14 +521,24 @@
             }
         }
 
-        // ==================== UI 更新 ====================
-        function addUserMessage(text, imageData) {
+        // ==================== UI 更新（带导出按钮）====================
+        function addUserMessage(text, imageDataUrls) {
             const msgDiv = document.createElement('div');
             msgDiv.className = 'message user';
             
             let content = '';
-            if (imageData) {
-                content += `<img src="${imageData}" class="message-image" alt="用户上传的图片">`;
+            if (imageDataUrls && imageDataUrls.length > 0) {
+                // 多图显示
+                if (imageDataUrls.length === 1) {
+                    content += `<img src="${imageDataUrls[0]}" class="message-image" alt="用户上传的图片">`;
+                } else {
+                    // 多图网格
+                    content += `<div class="message-images-grid">`;
+                    imageDataUrls.forEach(url => {
+                        content += `<img src="${url}" class="message-image" alt="用户上传的图片">`;
+                    });
+                    content += `</div>`;
+                }
             }
             if (text) {
                 content += `<p>${escapeHtml(text)}</p>`;
@@ -514,6 +575,31 @@
             scrollToBottom();
         }
 
+        // 更新消息内容并添加导出按钮
+        function updateMessageContentWithExport(msgObj, text) {
+            if (!msgObj.content) return;
+            
+            // 渲染Markdown
+            let html = renderMarkdown(text);
+            
+            // 检查是否有表格数据可以导出
+            const parsedData = parseMarkdownForExport(text);
+            if (parsedData.hasTables) {
+                html += `<div class="export-btn-container">
+                    <button class="export-excel-btn" onclick="exportToExcel(this)" data-raw="${escapeAttr(text)}">
+                        📥 导出Excel报价表
+                    </button>
+                </div>`;
+            }
+            
+            msgObj.content.innerHTML = html;
+            scrollToBottom();
+        }
+
+        function escapeAttr(text) {
+            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         function scrollToBottom() {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -532,8 +618,8 @@
             // 表格处理
             html = parseMarkdownTable(html);
             
-            // 标题
-            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            // 标题（配电箱分组标题高亮）
+            html = html.replace(/^### (.+)$/gm, '<h3 class="box-title">$1</h3>');
             html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
             html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
             
@@ -609,6 +695,252 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ==================== Excel 导出功能（纯JS实现）====================
+        
+        // 解析Markdown表格数据
+        function parseMarkdownForExport(text) {
+            const result = {
+                hasTables: false,
+                boxes: []  // [{name, items: [], summary: {}}]
+            };
+            
+            // 按配电箱标题分割内容
+            const boxPattern = /(?:^|\n)(###\s*[一二三四五六七八九十\d+\.]*[\s]*(?:配电箱?|Box|箱)[_\-]?\s*([A-Za-z0-9\u4e00-\u9fa5]+)|(?:^|\n)([A-Za-z0-9\u4e00-\u9fa5]{2,10})(?:AP|DB|BOX|配电箱)?[_\-\s]*?(?:元器件清单|物料清单|报价))/gm;
+            
+            // 简单方案：按 "###" 标题分割
+            const sections = text.split(/(?=###\s)/);
+            
+            let currentBox = null;
+            let currentItems = [];
+            let summaryData = [];
+            
+            sections.forEach(section => {
+                section = section.trim();
+                if (!section) return;
+                
+                // 检查是否是配电箱标题
+                const titleMatch = section.match(/^###\s*([^\n]+)/);
+                if (titleMatch) {
+                    // 保存上一个配电箱的数据
+                    if (currentBox && currentItems.length > 0) {
+                        result.boxes.push({
+                            name: currentBox,
+                            items: currentItems,
+                            summary: summaryData
+                        });
+                    }
+                    
+                    // 提取配电箱名称
+                    let boxName = titleMatch[1].trim();
+                    // 尝试提取配电箱编号
+                    const nameMatch = boxName.match(/(?:配电箱?|Box|箱)[_\-]?\s*([A-Za-z0-9\u4e00-\u9fa5]+)/i) 
+                                   || boxName.match(/^([A-Za-z0-9\u4e00-\u9fa5]{2,10})/)
+                                   || boxName.match(/([A-Za-z0-9\u4e00-\u9fa5]{2,10})/);
+                    currentBox = nameMatch ? nameMatch[1] : boxName;
+                    currentItems = [];
+                    summaryData = [];
+                }
+                
+                // 解析表格
+                const tableRegex = /^\|(.+)\|\s*\n\|[-:\s|]+\|\s*\n((?:\|.+\|\s*\n?)+)/gm;
+                let tableMatch;
+                
+                while ((tableMatch = tableRegex.exec(section)) !== null) {
+                    result.hasTables = true;
+                    const headerLine = tableMatch[1];
+                    const bodyLines = tableMatch[2];
+                    
+                    const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+                    const rows = bodyLines.trim().split('\n').map(row => {
+                        return row.split('|').map(cell => cell.trim()).filter(cell => cell);
+                    });
+                    
+                    // 判断是元器件清单还是汇总表
+                    const isItemTable = headers.some(h => /^(序号|序号|#)/.test(h)) || 
+                                        headers.some(h => /^(元器件|物料|名称)/.test(h));
+                    const isSummaryTable = headers.some(h => /^(配电箱|编号)/.test(h)) ||
+                                          headers.some(h => /^(元器件费用|人工管理费|合计)/.test(h));
+                    
+                    if (isItemTable && currentBox) {
+                        currentItems = currentItems.concat(rows);
+                    } else if (isSummaryTable) {
+                        summaryData = summaryData.concat(rows);
+                    } else if (currentBox) {
+                        // 默认当作元器件表
+                        currentItems = currentItems.concat(rows);
+                    }
+                }
+            });
+            
+            // 保存最后一个配电箱
+            if (currentBox && currentItems.length > 0) {
+                result.boxes.push({
+                    name: currentBox,
+                    items: currentItems,
+                    summary: summaryData
+                });
+            }
+            
+            return result;
+        }
+
+        // 生成Excel文件（SpreadsheetML XML格式，纯JS）
+        function generateExcel(boxes) {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+            const fileName = `配电箱报价_${dateStr}_${timeStr}.xls`;
+            
+            // XML编码函数
+            const xmlEncode = (str) => {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+            };
+            
+            // 生成工作表
+            const generateSheet = (sheetName, headers, rows) => {
+                let sheet = `<Worksheet ss:Name="${xmlEncode(sheetName)}">
+<Table>`;
+                
+                // 表头行
+                sheet += '<Row>';
+                headers.forEach(h => {
+                    sheet += `<Cell><Data ss:Type="String">${xmlEncode(h)}</Data></Cell>`;
+                });
+                sheet += '</Row>';
+                
+                // 数据行
+                rows.forEach(row => {
+                    sheet += '<Row>';
+                    row.forEach(cell => {
+                        // 判断数据类型
+                        const numValue = parseFloat(cell);
+                        if (!isNaN(numValue) && cell.trim() !== '') {
+                            sheet += `<Cell><Data ss:Type="Number">${numValue}</Data></Cell>`;
+                        } else {
+                            sheet += `<Cell><Data ss:Type="String">${xmlEncode(cell)}</Data></Cell>`;
+                        }
+                    });
+                    // 补充空白单元格
+                    for (let i = row.length; i < headers.length; i++) {
+                        sheet += `<Cell><Data ss:Type="String"></Data></Cell>`;
+                    }
+                    sheet += '</Row>';
+                });
+                
+                sheet += '</Table></Worksheet>';
+                return sheet;
+            };
+            
+            // 构建Workbook
+            let workbook = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>
+    <Style ss:ID="HeaderStyle">
+        <Font ss:Bold="1" ss:Color="#FFFFFF"/>
+        <Interior ss:Color="#1A365D" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="TitleStyle">
+        <Font ss:Bold="1" ss:Color="#1A365D"/>
+        <Interior ss:Color="#F7FAFC" ss:Pattern="Solid"/>
+    </Style>
+</Styles>`;
+            
+            // 生成每个配电箱的工作表
+            let allSummaryRows = [];
+            boxes.forEach(box => {
+                if (box.items.length > 0) {
+                    // 提取元器件表头（假设第一行是表头）
+                    const itemHeaders = ['序号', '元器件名称', '型号规格', '数量', '单价(元)', '小计(元)'];
+                    workbook += generateSheet(box.name, itemHeaders, box.items);
+                }
+                
+                // 收集汇总数据
+                if (box.summary.length > 0) {
+                    box.summary.forEach(row => {
+                        allSummaryRows.push(row);
+                    });
+                } else {
+                    // 如果没有汇总表，根据元器件表计算
+                    let total = 0;
+                    box.items.forEach(row => {
+                        // 尝试从最后一列获取小计
+                        const lastCol = row[row.length - 1];
+                        const num = parseFloat(lastCol);
+                        if (!isNaN(num)) {
+                            total += num;
+                        }
+                    });
+                    if (total > 0) {
+                        const management = total * 0.15;
+                        allSummaryRows.push([box.name, total.toFixed(2), management.toFixed(2), (total + management).toFixed(2)]);
+                    }
+                }
+            });
+            
+            // 生成汇总工作表
+            if (allSummaryRows.length > 0) {
+                const summaryHeaders = ['配电箱编号', '元器件费用(元)', '人工管理费(15%)(元)', '合计(元)'];
+                workbook += generateSheet('报价汇总', summaryHeaders, allSummaryRows);
+                
+                // 添加总计行
+                let totalSum = 0;
+                allSummaryRows.forEach(row => {
+                    const totalCol = row[row.length - 1];
+                    const num = parseFloat(totalCol);
+                    if (!isNaN(num)) totalSum += num;
+                });
+            }
+            
+            workbook += '</Workbook>';
+            
+            // 下载文件
+            const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 导出按钮点击处理（暴露到全局）
+        window.exportToExcel = function(button) {
+            const rawText = button.getAttribute('data-raw');
+            if (!rawText) {
+                alert('无法获取数据，请刷新页面后重试');
+                return;
+            }
+            
+            try {
+                const parsedData = parseMarkdownForExport(rawText);
+                
+                if (!parsedData.hasTables) {
+                    alert('未检测到可导出的表格数据');
+                    return;
+                }
+                
+                if (parsedData.boxes.length === 0) {
+                    alert('未识别到配电箱信息，请确保AI回复包含配电箱标题（如 ### 一、配电箱2AP1）');
+                    return;
+                }
+                
+                generateExcel(parsedData.boxes);
+            } catch (error) {
+                console.error('导出失败:', error);
+                alert('导出失败: ' + error.message);
+            }
+        };
     </script>
 </body>
 </html>
