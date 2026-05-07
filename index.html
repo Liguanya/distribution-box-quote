@@ -349,15 +349,15 @@
                         try {
                             const data = JSON.parse(dataStr);
                             
-                            // 处理增量文本
+                            // 处理增量文本（content是增量片段，需要追加）
                             if (currentEvent === 'conversation.message.delta') {
                                 if (data.type === 'answer' && data.content) {
-                                    fullContent = data.content;
+                                    fullContent += data.content;
                                     updateMessageContent(assistantMsg, fullContent);
                                 }
                             }
                             
-                            // 处理消息完成
+                            // 处理消息完成（content是完整文本，直接替换）
                             if (currentEvent === 'conversation.message.completed') {
                                 if (data.type === 'answer' && data.content) {
                                     fullContent = data.content;
