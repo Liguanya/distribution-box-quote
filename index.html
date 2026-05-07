@@ -286,14 +286,12 @@
 
         // ==================== Coze API 调用 ====================
         async function callCozeChat(content, assistantMsg) {
-            // 构建消息内容
             let messages = [{
                 role: 'user',
                 content: content,
                 content_type: 'text'
             }];
 
-            // 如果有上传图片，修改内容格式
             if (uploadedFileId) {
                 messages = [{
                     role: 'user',
@@ -305,8 +303,7 @@
                 }];
             }
 
-            // 创建对话
-            const createResponse = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`,
@@ -321,34 +318,16 @@
                 })
             });
 
-            if (!createResponse.ok) {
-                throw new Error(`API请求失败: ${createResponse.status}`);
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
             }
 
-            const createData = await createResponse.json();
-            if (createData.code !== 0) {
-                throw new Error(createData.msg || '创建对话失败');
-            }
-
-            const chatId = createData.data.id;
-            const conversationId = createData.data.conversation_id;
-
-            // 流式读取响应
-            const streamUrl = createData.data.stream_url;
-            await readStreamResponse(streamUrl, assistantMsg);
-        }
-
-        async function readStreamResponse(streamUrl, assistantMsg) {
-            const response = await fetch(streamUrl, {
-                headers: {
-                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`
-                }
-            });
-
+            // 流式SSE直接在响应体中
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
             let fullContent = '';
+            let currentEvent = '';
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -359,40 +338,100 @@
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (line.startsWith('data:')) {
-                        const dataStr = line.slice(5).trim();
+                    const trimmed = line.trim();
+                    
+                    if (trimmed.startsWith('event:')) {
+                        currentEvent = trimmed.slice(6).trim();
+                    } else if (trimmed.startsWith('data:')) {
+                        const dataStr = trimmed.slice(5).trim();
                         if (!dataStr) continue;
 
                         try {
                             const data = JSON.parse(dataStr);
                             
-                            // 处理不同类型的事件
-                            if (data.event === 'conversation.message.delta') {
-                                const delta = data.data?.content || '';
-                                if (delta) {
-                                    fullContent += delta;
-                                    // 更新消息内容（带打字效果）
-                                    updateMessageWithTyping(assistantMsg, fullContent);
+                            // 处理增量文本
+                            if (currentEvent === 'conversation.message.delta') {
+                                if (data.type === 'answer' && data.content) {
+                                    fullContent = data.content;
+                                    updateMessageContent(assistantMsg, fullContent);
                                 }
                             }
                             
                             // 处理消息完成
-                            if (data.event === 'conversation.message.completed') {
-                                const role = data.data?.role;
-                                if (role === 'assistant') {
-                                    fullContent = data.data?.content || fullContent;
-                                    updateMessageWithTyping(assistantMsg, fullContent);
+                            if (currentEvent === 'conversation.message.completed') {
+                                if (data.type === 'answer' && data.content) {
+                                    fullContent = data.content;
+                                    updateMessageContent(assistantMsg, fullContent);
                                 }
-                            }
-
-                            // 处理对话完成
-                            if (data.event === 'conversation.chat.completed') {
-                                console.log('对话完成');
                             }
                         } catch (e) {
                             // 忽略解析错误
                         }
                     }
+                }
+            }
+
+            // 如果流式没有收到内容，用非流式兜底
+            if (!fullContent) {
+                await callCozeChatNonStream(content, messages, assistantMsg);
+            }
+        }
+
+        // 非流式兜底方案
+        async function callCozeChatNonStream(content, messages, assistantMsg) {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bot_id: CONFIG.BOT_ID,
+                    user_id: CONFIG.USER_ID,
+                    stream: false,
+                    auto_save_history: true,
+                    additional_messages: messages
+                })
+            });
+
+            const createData = await response.json();
+            if (createData.code !== 0) {
+                throw new Error(createData.msg || '创建对话失败');
+            }
+
+            const chatId = createData.data.id;
+            const conversationId = createData.data.conversation_id;
+
+            // 轮询等待完成
+            for (let i = 0; i < 60; i++) {
+                await new Promise(r => setTimeout(r, 2000));
+                
+                const pollResp = await fetch(
+                    `${CONFIG.API_BASE_URL}/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${conversationId}`,
+                    { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
+                );
+                const pollData = await pollResp.json();
+                
+                if (pollData.data && pollData.data.status === 'completed') {
+                    // 获取消息列表
+                    const msgResp = await fetch(
+                        `${CONFIG.API_BASE_URL}/v3/chat/message/list?chat_id=${chatId}&conversation_id=${conversationId}`,
+                        { headers: { 'Authorization': `Bearer ${CONFIG.PAT_TOKEN}` } }
+                    );
+                    const msgData = await msgResp.json();
+                    
+                    if (msgData.data) {
+                        const answer = msgData.data.find(m => m.type === 'answer' && m.role === 'assistant');
+                        if (answer && answer.content) {
+                            updateMessageContent(assistantMsg, answer.content);
+                            return;
+                        }
+                    }
+                    break;
+                }
+                
+                if (pollData.data && pollData.data.status === 'failed') {
+                    throw new Error('对话处理失败');
                 }
             }
         }
@@ -435,7 +474,7 @@
             };
         }
 
-        function updateMessageWithTyping(msgObj, text) {
+        function updateMessageContent(msgObj, text) {
             if (!msgObj.content) return;
             msgObj.content.innerHTML = renderMarkdown(text);
             scrollToBottom();
