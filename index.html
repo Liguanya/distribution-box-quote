@@ -42,13 +42,34 @@
                 <span class="sdk-title">智能对话窗口</span>
             </div>
             <div id="coze-chat-container">
-            <!-- Coze Web SDK Iframe 嵌入方式（无需加载外部JS） -->
-            <iframe 
-                id="coze-web-sdk" 
-                src="https://sdk.coze.site" 
-                style="width: 100%; height: 100%; min-height: 650px; border: none; border-radius: 0 0 12px 12px;"
-                allow="microphone; camera"
-            ></iframe>
+                <!-- 自定义对话界面 -->
+                <div class="chat-wrapper">
+                    <div class="chat-messages" id="chat-messages">
+                        <!-- 欢迎消息 -->
+                        <div class="message assistant">
+                            <div class="message-avatar">⚡</div>
+                            <div class="message-content">
+                                <p>你好！我是配电箱智能识别报价助手。请上传配电箱系统图，我会自动识别元器件并生成报价。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 图片预览区 -->
+                    <div class="image-preview-area" id="image-preview-area" style="display: none;">
+                        <div class="image-preview-item">
+                            <img id="preview-image" src="" alt="预览图片">
+                            <button class="remove-image-btn" id="remove-image-btn" title="移除图片">×</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 输入区域 -->
+                    <div class="chat-input-area">
+                        <button class="upload-btn" id="upload-btn" title="上传配电箱图片">📎</button>
+                        <input type="file" id="file-input" accept="image/*" hidden>
+                        <input type="text" id="msg-input" placeholder="输入消息或上传配电箱系统图...">
+                        <button class="send-btn" id="send-btn">发送</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -129,44 +150,392 @@
         </div>
     </footer>
 
-    <!-- 加载提示 -->
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p class="loading-text">正在连接智能助手...</p>
-    </div>
-
-    <!-- Coze Web SDK Iframe 通信脚本 -->
+    <!-- Coze API 调用脚本 -->
     <script>
-        const cozeIframe = document.getElementById("coze-web-sdk");
-        const COZE_WEB_SDK_ORIGIN = "https://sdk.coze.site";
+        // ==================== 配置 ====================
+        const CONFIG = {
+            API_BASE_URL: 'https://api.coze.cn',
+            BOT_ID: '7636708997047091219',
+            PAT_TOKEN: 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5',
+            USER_ID: 'web_user_' + Math.random().toString(36).substring(2, 10)
+        };
 
-        window.addEventListener("message", (event) => {
-            if (event.origin !== COZE_WEB_SDK_ORIGIN) {
-                return;
-            }
-            const data = event.data;
+        // ==================== DOM 元素 ====================
+        const chatMessages = document.getElementById('chat-messages');
+        const msgInput = document.getElementById('msg-input');
+        const sendBtn = document.getElementById('send-btn');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('file-input');
+        const imagePreviewArea = document.getElementById('image-preview-area');
+        const previewImage = document.getElementById('preview-image');
+        const removeImageBtn = document.getElementById('remove-image-btn');
 
-            if (data.type === "IFRAME_READY") {
-                cozeIframe.contentWindow.postMessage({
-                    type: "INIT",
-                    payload: {
-                        token: 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5',
-                        projectId: '7636692855800610831'
-                    }
-                }, COZE_WEB_SDK_ORIGIN);
+        // 状态
+        let uploadedFileId = null;
+        let isProcessing = false;
 
-                document.getElementById('loading-overlay').style.display = 'none';
-            }
-
-            if (data.type === "TOKEN_EXPIRED") {
-                cozeIframe.contentWindow.postMessage({
-                    type: "UPDATE_TOKEN",
-                    payload: {
-                        token: 'pat_o24H2ZDE0AqdFUlAhMvoCENYXSqShWIFl1uC31LugL7eq9atMkNA6O6aQUDnTUt5',
-                    }
-                }, COZE_WEB_SDK_ORIGIN);
+        // ==================== 事件绑定 ====================
+        sendBtn.addEventListener('click', handleSend);
+        msgInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
             }
         });
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        removeImageBtn.addEventListener('click', clearImagePreview);
+
+        // ==================== 文件处理 ====================
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                alert('请上传图片文件');
+                return;
+            }
+
+            // 预览图片
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                previewImage.src = event.target.result;
+                imagePreviewArea.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+
+            // 上传文件到Coze
+            uploadFileToCoze(file);
+        }
+
+        function clearImagePreview() {
+            previewImage.src = '';
+            imagePreviewArea.style.display = 'none';
+            fileInput.value = '';
+            uploadedFileId = null;
+        }
+
+        async function uploadFileToCoze(file) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${CONFIG.API_BASE_URL}/v1/files/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.code === 0 && data.data) {
+                    uploadedFileId = data.data.id;
+                    console.log('文件上传成功:', uploadedFileId);
+                } else {
+                    console.error('文件上传失败:', data);
+                    alert('图片上传失败，请重试');
+                    clearImagePreview();
+                }
+            } catch (error) {
+                console.error('上传错误:', error);
+                alert('图片上传失败，请重试');
+                clearImagePreview();
+            }
+        }
+
+        // ==================== 消息处理 ====================
+        async function handleSend() {
+            const message = msgInput.value.trim();
+            
+            if (!message && !uploadedFileId) {
+                alert('请输入消息或上传图片');
+                return;
+            }
+
+            if (isProcessing) return;
+            isProcessing = true;
+            sendBtn.disabled = true;
+            sendBtn.textContent = '处理中...';
+
+            // 添加用户消息
+            addUserMessage(message, previewImage.src || null);
+            msgInput.value = '';
+
+            // 创建助手消息占位
+            const assistantMsg = addAssistantMessage('');
+
+            try {
+                // 构建消息内容
+                let content = message || '识别图中配电箱及元器件并组价';
+                
+                // 调用Coze API
+                await callCozeChat(content, assistantMsg);
+            } catch (error) {
+                console.error('发送错误:', error);
+                assistantMsg.content.innerHTML = '<p style="color: #e53e3e;">发送消息失败，请重试</p>';
+            }
+
+            // 清理图片预览
+            clearImagePreview();
+            
+            isProcessing = false;
+            sendBtn.disabled = false;
+            sendBtn.textContent = '发送';
+        }
+
+        // ==================== Coze API 调用 ====================
+        async function callCozeChat(content, assistantMsg) {
+            // 构建消息内容
+            let messages = [{
+                role: 'user',
+                content: content,
+                content_type: 'text'
+            }];
+
+            // 如果有上传图片，修改内容格式
+            if (uploadedFileId) {
+                messages = [{
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: content },
+                        { type: 'image', file_id: uploadedFileId }
+                    ],
+                    content_type: 'object_string'
+                }];
+            }
+
+            // 创建对话
+            const createResponse = await fetch(`${CONFIG.API_BASE_URL}/v3/chat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    bot_id: CONFIG.BOT_ID,
+                    user_id: CONFIG.USER_ID,
+                    stream: true,
+                    auto_save_history: true,
+                    additional_messages: messages
+                })
+            });
+
+            if (!createResponse.ok) {
+                throw new Error(`API请求失败: ${createResponse.status}`);
+            }
+
+            const createData = await createResponse.json();
+            if (createData.code !== 0) {
+                throw new Error(createData.msg || '创建对话失败');
+            }
+
+            const chatId = createData.data.id;
+            const conversationId = createData.data.conversation_id;
+
+            // 流式读取响应
+            const streamUrl = createData.data.stream_url;
+            await readStreamResponse(streamUrl, assistantMsg);
+        }
+
+        async function readStreamResponse(streamUrl, assistantMsg) {
+            const response = await fetch(streamUrl, {
+                headers: {
+                    'Authorization': `Bearer ${CONFIG.PAT_TOKEN}`
+                }
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        const dataStr = line.slice(5).trim();
+                        if (!dataStr) continue;
+
+                        try {
+                            const data = JSON.parse(dataStr);
+                            
+                            // 处理不同类型的事件
+                            if (data.event === 'conversation.message.delta') {
+                                const delta = data.data?.content || '';
+                                if (delta) {
+                                    fullContent += delta;
+                                    // 更新消息内容（带打字效果）
+                                    updateMessageWithTyping(assistantMsg, fullContent);
+                                }
+                            }
+                            
+                            // 处理消息完成
+                            if (data.event === 'conversation.message.completed') {
+                                const role = data.data?.role;
+                                if (role === 'assistant') {
+                                    fullContent = data.data?.content || fullContent;
+                                    updateMessageWithTyping(assistantMsg, fullContent);
+                                }
+                            }
+
+                            // 处理对话完成
+                            if (data.event === 'conversation.chat.completed') {
+                                console.log('对话完成');
+                            }
+                        } catch (e) {
+                            // 忽略解析错误
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==================== UI 更新 ====================
+        function addUserMessage(text, imageData) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message user';
+            
+            let content = '';
+            if (imageData) {
+                content += `<img src="${imageData}" class="message-image" alt="用户上传的图片">`;
+            }
+            if (text) {
+                content += `<p>${escapeHtml(text)}</p>`;
+            }
+            
+            msgDiv.innerHTML = `
+                <div class="message-content">${content}</div>
+                <div class="message-avatar">👤</div>
+            `;
+            chatMessages.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function addAssistantMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message assistant';
+            
+            msgDiv.innerHTML = `
+                <div class="message-avatar">⚡</div>
+                <div class="message-content"><p>${text ? renderMarkdown(text) : '<span class="typing-cursor">|</span>'}</p></div>
+            `;
+            chatMessages.appendChild(msgDiv);
+            scrollToBottom();
+
+            return {
+                element: msgDiv,
+                content: msgDiv.querySelector('.message-content p')
+            };
+        }
+
+        function updateMessageWithTyping(msgObj, text) {
+            if (!msgObj.content) return;
+            msgObj.content.innerHTML = renderMarkdown(text);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ==================== Markdown 渲染（简化版）====================
+        function renderMarkdown(text) {
+            if (!text) return '';
+            
+            // 转义HTML
+            let html = escapeHtml(text);
+            
+            // 代码块
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // 表格处理
+            html = parseMarkdownTable(html);
+            
+            // 标题
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            
+            // 粗体和斜体
+            html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            
+            // 列表
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+            
+            // 换行
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            
+            // 清理多余的p标签
+            html = '<p>' + html + '</p>';
+            html = html.replace(/<p><\/p>/g, '');
+            html = html.replace(/<p>(<h[1-3]>)/g, '$1');
+            html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<ul>)/g, '$1');
+            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<pre>)/g, '$1');
+            html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+
+            return html;
+        }
+
+        function parseMarkdownTable(text) {
+            const tableRegex = /^\|(.+)\|\s*\n\|[-:\s|]+\|\s*\n((?:\|.+\|\s*\n?)+)/gm;
+            
+            return text.replace(tableRegex, (match, headerLine, bodyLines) => {
+                // 解析表头
+                const headers = headerLine.split('|').map(h => h.trim()).filter(h => h);
+                
+                // 解析表体
+                const rows = bodyLines.trim().split('\n').map(row => {
+                    return row.split('|').map(cell => cell.trim()).filter(cell => cell);
+                });
+                
+                // 生成HTML表格
+                let table = '<div class="table-wrapper"><table class="markdown-table">';
+                
+                // 表头
+                table += '<thead><tr>';
+                headers.forEach(h => {
+                    table += `<th>${h}</th>`;
+                });
+                table += '</tr></thead>';
+                
+                // 表体
+                table += '<tbody>';
+                rows.forEach(row => {
+                    table += '<tr>';
+                    row.forEach((cell, i) => {
+                        table += `<td>${cell}</td>`;
+                    });
+                    // 如果单元格数少于表头，补充空白
+                    for (let i = row.length; i < headers.length; i++) {
+                        table += '<td></td>';
+                    }
+                    table += '</tr>';
+                });
+                table += '</tbody></table></div>';
+                
+                return table;
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
